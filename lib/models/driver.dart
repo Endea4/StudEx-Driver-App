@@ -36,23 +36,28 @@ class Driver {
   });
 
   factory Driver.fromJson(Map<String, dynamic> json) {
+    final vehicle = json['vehicle_info'] as Map<String, dynamic>? ?? {};
+    final metrics = json['performance_metrics'] as Map<String, dynamic>? ?? {};
+
     return Driver(
       id: json['id'] ?? '',
-      phone: json['phone'] ?? '',
-      name: json['name'] ?? '',
-      displayName: json['display_name'] ?? '',
+      phone: json['phone_wa_primary'] ?? json['phone'] ?? '',
+      name: json['fullname'] ?? json['name'] ?? '',
+      displayName: json['display_name']?.toString().isNotEmpty == true
+          ? json['display_name']
+          : json['fullname'] ?? json['name'] ?? '',
       gender: json['gender'] ?? '',
-      vehicleType: json['vehicle_type'] ?? '',
-      plateNumber: json['plate_number'] ?? '',
+      vehicleType: vehicle['vehicle_type'] ?? json['vehicle_type'] ?? '',
+      plateNumber: vehicle['license_plate'] ?? json['plate_number'] ?? '',
       profilePhoto: json['profile_photo'] ?? '',
       inventory: json['inventory'] != null ? List<String>.from(json['inventory']) : [],
       isActive: json['is_active'] ?? false,
-      status: json['status'] ?? 'offline',
-      reputationScore: (json['reputation_score'] ?? 0).toDouble(),
-      totalOrders: json['total_orders'] ?? 0,
-      totalRejects: json['total_rejects'] ?? 0,
-      totalCancels: json['total_cancels'] ?? 0,
-      totalIncome: json['total_income'] ?? 0,
+      status: json['checkpoint_status'] ?? json['status'] ?? 'offline',
+      reputationScore: (metrics['average_rating'] ?? json['reputation_score'] ?? 0).toDouble(),
+      totalOrders: metrics['total_orders'] ?? json['total_orders'] ?? 0,
+      totalRejects: metrics['failed_orders'] ?? json['total_rejects'] ?? 0,
+      totalCancels: metrics['failed_orders'] ?? json['total_cancels'] ?? 0,
+      totalIncome: (metrics['total_earnings'] ?? json['total_income'] ?? 0).toInt(),
     );
   }
 }

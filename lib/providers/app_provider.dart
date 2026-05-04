@@ -62,11 +62,11 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> signIn(String phone) async {
+  Future<bool> signIn(String phone, String password) async {
     _setLoading(true);
     _setError(null);
     try {
-      final driver = await authService.signIn(phone);
+      final driver = await authService.signIn(phone, password);
       await localStorage.savePhone(phone);
       _isAuthenticated = true;
       notifyListeners();

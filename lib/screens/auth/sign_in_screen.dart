@@ -11,31 +11,55 @@ class SignInScreen extends StatefulWidget {
 
 class _SignInScreenState extends State<SignInScreen> {
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   Future<void> _signIn() async {
     final phone = _phoneController.text.trim();
-    if (phone.isEmpty) return;
+    final password = _passwordController.text.trim();
+    if (phone.isEmpty || password.isEmpty) return;
 
     final app = context.read<AppProvider>();
-    final success = await app.signIn(phone);
-    if (!mounted) return;
-    if (success) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    } else {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          title: const Text('Error'),
-          content: Text(app.error ?? 'Sign in failed'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+    try {
+      final success = await app.signIn(phone, password);
+      if (!mounted) return;
+      if (success) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      } else {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              title: const Text('Error'),
+              content: Text(app.error ?? 'Sign in failed'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: const Text('Error'),
+            content: Text('Network error: ${e.toString()}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -56,7 +80,7 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Masukkan nomor WhatsApp untuk masuk',
+                'Masukkan nomor WhatsApp dan password untuk masuk',
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 32),
@@ -68,6 +92,20 @@ class _SignInScreenState extends State<SignInScreen> {
                   hintText: '628xxxxxxxxxx',
                   prefixIcon: Icon(Icons.phone),
                   border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -101,6 +139,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 }

@@ -22,8 +22,10 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _driver = await _authService.getProfile();
+      print('[DRIVER] profile loaded: ${_driver?.name}');
     } catch (e) {
       _error = e.toString();
+      print('[DRIVER] profile error: $_error');
     } finally {
       _isLoading = false;
       notifyListeners();
