@@ -1,6 +1,6 @@
 class ApiConstants {
-  static const String baseUrl = 'http://127.0.0.1:9080';
-  static const String wsUrl = 'ws://127.0.0.1:9080';
+  static const String baseUrl = 'http://192.168.100.46:9080';
+  static const String wsUrl = 'ws://192.168.100.46:9080';
 
   static const String auth = '/drivers/auth';
   static const String authLogout = '/drivers/auth/logout';

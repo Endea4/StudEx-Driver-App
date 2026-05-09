@@ -31,8 +31,8 @@ class LocationService {
     _isStreaming = true;
 
     const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
+      accuracy: LocationAccuracy.low,
+      distanceFilter: 0,
     );
 
     _positionSubscription = Geolocator.getPositionStream(
@@ -52,7 +52,7 @@ class LocationService {
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'driver_id': driverId,
+          'ref_id': driverId,
           'latitude': lat,
           'longitude': lng,
         }),
