@@ -19,7 +19,11 @@ class AuthService {
       final data = jsonDecode(res.body);
       final token = data['token'] ?? '';
       if (token.isNotEmpty) _api.setToken(token);
-      return Driver.fromJson(data['driver'] ?? data);
+      final driver = Driver.fromJson(data['driver'] ?? data);
+      if (driver.id.isNotEmpty) {
+        await _storage.saveDriverId(driver.id);
+      }
+      return driver;
     } else {
       throw Exception('Sign in failed: ${res.body}');
     }

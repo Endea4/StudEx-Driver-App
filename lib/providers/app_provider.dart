@@ -37,7 +37,7 @@ class AppProvider extends ChangeNotifier {
     debtService = DebtService(apiClient);
     ratingService = RatingService(apiClient);
     reputationService = ReputationService(apiClient);
-    locationService = LocationService(wsClient);
+    locationService = LocationService(localStorage);
 
     final token = localStorage.getToken();
     if (token != null && token.isNotEmpty) {

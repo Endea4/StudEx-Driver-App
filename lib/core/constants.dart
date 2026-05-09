@@ -7,6 +7,7 @@ class ApiConstants {
   static const String driverMe = '/drivers/me';
   static const String driverStatus = '/drivers/me/status';
   static const String driverWsLocation = '/ws/drivers/location';
+  static const String locationUpdate = '/location';
   static const String driverDebts = '/drivers/debts';
   static const String driverRatingsPending = '/drivers/ratings/pending';
   static const String driverRatings = '/drivers/ratings';

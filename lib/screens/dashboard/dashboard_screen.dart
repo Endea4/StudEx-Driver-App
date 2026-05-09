@@ -44,7 +44,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (_gpsEnabled) {
       locationService.stopStreaming();
-      app.wsClient.disconnect();
       setState(() => _gpsEnabled = false);
     } else {
       final hasPermission = await locationService.checkPermissions();
@@ -55,7 +54,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
         return;
       }
-      app.wsClient.connect();
       locationService.startStreaming();
       setState(() => _gpsEnabled = true);
     }

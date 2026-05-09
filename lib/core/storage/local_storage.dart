@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LocalStorage {
   static const _keyToken = 'driver_token';
   static const _keyPhone = 'driver_phone';
+  static const _keyDriverId = 'driver_id';
   static const _keyGpsEnabled = 'gps_enabled';
 
   final SharedPreferences _prefs;
@@ -21,6 +22,12 @@ class LocalStorage {
 
   String? getPhone() => _prefs.getString(_keyPhone);
 
+  Future<void> saveDriverId(String id) async {
+    await _prefs.setString(_keyDriverId, id);
+  }
+
+  String? getDriverId() => _prefs.getString(_keyDriverId);
+
   Future<void> saveGpsEnabled(bool enabled) async {
     await _prefs.setBool(_keyGpsEnabled, enabled);
   }
@@ -30,6 +37,7 @@ class LocalStorage {
   Future<void> clear() async {
     await _prefs.remove(_keyToken);
     await _prefs.remove(_keyPhone);
+    await _prefs.remove(_keyDriverId);
     await _prefs.remove(_keyGpsEnabled);
   }
 }

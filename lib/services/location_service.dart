@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
-import '../core/network/websocket_client.dart';
+import 'package:http/http.dart' as http;
+import '../core/constants.dart';
+import '../core/storage/local_storage.dart';
 
 class LocationService {
-  final WebSocketClient _ws;
+  final LocalStorage _storage;
   StreamSubscription<Position>? _positionSubscription;
   bool _isStreaming = false;
 
-  LocationService(this._ws);
+  LocationService(this._storage);
 
   bool get isStreaming => _isStreaming;
 
@@ -35,8 +38,26 @@ class LocationService {
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((Position position) {
-      _ws.sendLocation(position.latitude, position.longitude);
+      _sendLocationUpdate(position.latitude, position.longitude);
     });
+  }
+
+  Future<void> _sendLocationUpdate(double lat, double lng) async {
+    try {
+      final driverId = await _storage.getDriverId();
+      if (driverId == null || driverId.isEmpty) return;
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.locationUpdate}');
+      await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'driver_id': driverId,
+          'latitude': lat,
+          'longitude': lng,
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
   }
 
   void stopStreaming() {
