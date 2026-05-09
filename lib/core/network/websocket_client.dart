@@ -20,7 +20,7 @@ class WebSocketClient {
   void connect() {
     if (_disposed || _token == null) return;
 
-    final uri = Uri.parse('${ApiConstants.wsUrl}${ApiConstants.driverWsLocation}');
+    final uri = Uri.parse('${ApiConstants.wsUrl}/ws');
     _channel = WebSocketChannel.connect(
       uri,
       protocols: [_token!],

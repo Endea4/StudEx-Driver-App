@@ -47,7 +47,7 @@ class LocationService {
       final driverId = await _storage.getDriverId();
       if (driverId == null || driverId.isEmpty) return;
 
-      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.locationUpdate}');
+      final uri = Uri.parse('${ApiConstants.realtimeUrl}${ApiConstants.locationUpdate}');
       await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
