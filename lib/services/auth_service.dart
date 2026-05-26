@@ -18,7 +18,10 @@ class AuthService {
     if (res.statusCode == 200 || res.statusCode == 201) {
       final data = jsonDecode(res.body);
       final token = data['token'] ?? '';
-      if (token.isNotEmpty) _api.setToken(token);
+      if (token.isNotEmpty) {
+        _api.setToken(token);
+        await _storage.saveToken(token);
+      }
       final driver = Driver.fromJson(data['driver'] ?? data);
       if (driver.id.isNotEmpty) {
         await _storage.saveDriverId(driver.id);

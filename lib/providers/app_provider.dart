@@ -43,7 +43,12 @@ class AppProvider extends ChangeNotifier {
     if (token != null && token.isNotEmpty) {
       apiClient.setToken(token);
       wsClient.setToken(token);
+      final driverId = localStorage.getDriverId();
+      if (driverId != null && driverId.isNotEmpty) {
+        wsClient.setDriverId(driverId);
+      }
       _isAuthenticated = true;
+      wsClient.connect();
     }
   }
 
@@ -68,11 +73,16 @@ class AppProvider extends ChangeNotifier {
     try {
       final driver = await authService.signIn(phone, password);
       await localStorage.savePhone(phone);
+      final token = localStorage.getToken();
+      if (token != null && token.isNotEmpty) {
+        wsClient.setToken(token);
+      }
       final driverId = await localStorage.getDriverId();
       if (driverId != null && driverId.isNotEmpty) {
         wsClient.setDriverId(driverId);
       }
       _isAuthenticated = true;
+      wsClient.connect();
       notifyListeners();
       return true;
     } catch (e) {
