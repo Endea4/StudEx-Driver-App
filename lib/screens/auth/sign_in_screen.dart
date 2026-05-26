@@ -85,6 +85,7 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
               const SizedBox(height: 32),
               TextField(
+                key: const Key('phone_field'),
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
@@ -96,6 +97,7 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
               const SizedBox(height: 16),
               TextField(
+                key: const Key('password_field'),
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
@@ -113,18 +115,22 @@ class _SignInScreenState extends State<SignInScreen> {
                 builder: (context, app, _) {
                   return SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: app.isLoading ? null : _signIn,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Semantics(
+                      label: 'sign_in_button',
+                      child: ElevatedButton(
+                        key: const Key('sign_in_button'),
+                        onPressed: app.isLoading ? null : _signIn,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: app.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Masuk'),
                       ),
-                      child: app.isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Masuk'),
                     ),
                   );
                 },

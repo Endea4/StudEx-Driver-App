@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node", "@wdio/mocha-framework"]
+  },
+  "include": ["./test/**/*.ts", "./wdio.conf.ts"]
+}

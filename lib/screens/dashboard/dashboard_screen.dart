@@ -150,6 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Dashboard'),
         actions: [
           IconButton(
+            key: const Key('logout_button'),
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await context.read<AppProvider>().logout();
@@ -217,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(driver.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Semantics(label: 'driver_name', child: Text(driver.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
                   const SizedBox(height: 4),
                   Text(driver.vehicleType, style: const TextStyle(color: Colors.grey)),
                   Text(driver.plateNumber, style: const TextStyle(color: Colors.grey)),
@@ -258,6 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _statusChip(String label, String status, String currentStatus, Color color) {
     final isSelected = currentStatus == status;
     return ChoiceChip(
+      key: Key('status_$status'),
       label: Text(label),
       selected: isSelected,
       selectedColor: color.withOpacity(0.2),
@@ -268,6 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildGpsCard() {
     return Card(
       child: SwitchListTile(
+        key: const Key('gps_toggle'),
         title: const Text('Bagikan Lokasi GPS'),
         subtitle: Text(_gpsEnabled ? 'GPS aktif - lokasi dibagikan' : 'GPS nonaktif'),
         secondary: Icon(
@@ -327,8 +330,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _navCard(IconData icon, String title, String route) {
     return Card(
       child: ListTile(
+        key: Key('nav_$route'),
         leading: Icon(icon),
-        title: Text(title),
+        title: Semantics(label: 'nav_$title', child: Text(title)),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.pushNamed(context, route),
       ),

@@ -1,0 +1,21 @@
+{
+  "name": "studex-driver-e2e",
+  "version": "1.0.0",
+  "description": "Appium E2E tests for StudEx Driver App",
+  "scripts": {
+    "test": "wdio run wdio.conf.ts",
+    "test:login": "wdio run wdio.conf.ts --spec ./test/specs/login.spec.ts",
+    "test:dashboard": "wdio run wdio.conf.ts --spec ./test/specs/dashboard.spec.ts",
+    "test:nav": "wdio run wdio.conf.ts --spec ./test/specs/navigation.spec.ts",
+    "appium": "appium"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^9.12.0",
+    "@wdio/local-runner": "^9.12.0",
+    "@wdio/mocha-framework": "^9.12.0",
+    "@wdio/spec-reporter": "^9.12.0",
+    "webdriverio": "^9.12.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}

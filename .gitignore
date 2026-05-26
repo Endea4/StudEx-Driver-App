@@ -46,3 +46,8 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# E2E
+e2e/node_modules/
+e2e/package-lock.json
+e2e/.env
+e2e/test/screenshots/
