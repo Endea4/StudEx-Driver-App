@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/driver_provider.dart';
@@ -14,13 +15,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _gpsEnabled = false;
   bool _showReasonDialog = false;
   String _pendingStatus = '';
+  StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DriverProvider>().fetchProfile();
+      _listenWsEvents();
     });
+  }
+
+  void _listenWsEvents() {
+    final app = context.read<AppProvider>();
+    _wsSubscription = app.wsClient.stream.listen((event) {
+      if (!mounted) return;
+      final type = event['type'] as String? ?? '';
+      if (type == 'match.completed') {
+        final data = event['data'] as Map<String, dynamic>? ?? {};
+        final orderId = data['order_id'] ?? '-';
+        final score = data['score'] ?? 0;
+        _showNotification(
+          'Pesanan Baru!',
+          'Order $orderId masuk (score: ${score.toStringAsFixed(2)})',
+          Icons.local_shipping,
+          Colors.blue,
+        );
+      } else if (type == 'trip.created') {
+        final data = event['data'] as Map<String, dynamic>? ?? {};
+        final tripId = data['trip_id'] ?? '-';
+        _showNotification(
+          'Trip Dibuat',
+          'Trip $tripId menunggu konfirmasi',
+          Icons.assignment,
+          Colors.orange,
+        );
+      } else if (type == 'trip.started') {
+        _showNotification(
+          'Trip Dimulai',
+          'Perjalanan dimulai',
+          Icons.directions_bike,
+          Colors.green,
+        );
+      } else if (type == 'trip.completed') {
+        _showNotification(
+          'Trip Selesai',
+          'Perjalanan selesai',
+          Icons.check_circle,
+          Colors.teal,
+        );
+      } else if (type == 'trip.cancelled') {
+        _showNotification(
+          'Trip Dibatalkan',
+          'Perjalanan dibatalkan',
+          Icons.cancel,
+          Colors.red,
+        );
+      } else if (type == 'match.timeout') {
+        _showNotification(
+          'Match Timeout',
+          'Tidak ada driver tersedia',
+          Icons.timer_off,
+          Colors.grey,
+        );
+      }
+    });
+  }
+
+  void _showNotification(String title, String body, IconData icon, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(body, style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: color.withOpacity(0.9),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _toggleStatus(String status) async {
@@ -253,6 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _wsSubscription?.cancel();
     final app = context.read<AppProvider>();
     app.locationService.stopStreaming();
     app.wsClient.disconnect();

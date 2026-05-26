@@ -68,6 +68,10 @@ class AppProvider extends ChangeNotifier {
     try {
       final driver = await authService.signIn(phone, password);
       await localStorage.savePhone(phone);
+      final driverId = await localStorage.getDriverId();
+      if (driverId != null && driverId.isNotEmpty) {
+        wsClient.setDriverId(driverId);
+      }
       _isAuthenticated = true;
       notifyListeners();
       return true;
