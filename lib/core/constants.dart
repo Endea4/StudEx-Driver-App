@@ -1,7 +1,9 @@
+import 'env_config.dart';
+
 class ApiConstants {
-  static const String baseUrl = 'http://100.85.144.5:9080';
-  static const String realtimeUrl = 'http://100.85.144.5:9081';
-  static const String wsUrl = 'ws://100.85.144.5:9081';
+  static const String baseUrl = EnvConfig.serverUrl;
+  static const String realtimeUrl = EnvConfig.realtimeUrl;
+  static const String wsUrl = EnvConfig.wsUrl;
 
   static const String auth = '/drivers/auth';
   static const String authLogout = '/drivers/auth/logout';

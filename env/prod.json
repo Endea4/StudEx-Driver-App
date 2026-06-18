@@ -1,0 +1,5 @@
+{
+  "SERVER_URL": "https://api.studex.app",
+  "REALTIME_URL": "https://realtime.studex.app",
+  "WS_URL": "wss://realtime.studex.app"
+}
