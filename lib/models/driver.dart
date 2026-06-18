@@ -39,9 +39,27 @@ class Driver {
     final vehicle = json['vehicle_info'] as Map<String, dynamic>? ?? {};
     final metrics = json['performance_metrics'] as Map<String, dynamic>? ?? {};
 
+    String phone = '';
+    if (json['phone_wa_primary'] != null) {
+      phone = json['phone_wa_primary'].toString();
+    } else if (json['phone'] is List && (json['phone'] as List).isNotEmpty) {
+      phone = json['phone'][0].toString();
+    } else if (json['phone'] is String) {
+      phone = json['phone'];
+    }
+
+    bool isActive = json['is_active'] ?? false;
+    if (!isActive && json['driver_status'] == 'READY') {
+      isActive = true;
+    }
+
+    String status = json['driver_status']?.toString().isNotEmpty == true
+        ? json['driver_status']
+        : json['checkpoint_status'] ?? json['status'] ?? 'offline';
+
     return Driver(
       id: json['id'] ?? '',
-      phone: json['phone_wa_primary'] ?? json['phone'] ?? '',
+      phone: phone,
       name: json['fullname'] ?? json['name'] ?? '',
       displayName: json['display_name']?.toString().isNotEmpty == true
           ? json['display_name']
@@ -51,12 +69,12 @@ class Driver {
       plateNumber: vehicle['license_plate'] ?? json['plate_number'] ?? '',
       profilePhoto: json['profile_photo'] ?? '',
       inventory: json['inventory'] != null ? List<String>.from(json['inventory']) : [],
-      isActive: json['is_active'] ?? false,
-      status: json['checkpoint_status'] ?? json['status'] ?? 'offline',
+      isActive: isActive,
+      status: status,
       reputationScore: (metrics['average_rating'] ?? json['reputation_score'] ?? 0).toDouble(),
-      totalOrders: metrics['total_orders'] ?? json['total_orders'] ?? 0,
+      totalOrders: metrics['completed_orders'] ?? metrics['total_orders'] ?? json['total_orders'] ?? 0,
       totalRejects: metrics['failed_orders'] ?? json['total_rejects'] ?? 0,
-      totalCancels: metrics['failed_orders'] ?? json['total_cancels'] ?? 0,
+      totalCancels: json['total_cancels'] ?? metrics['failed_orders'] ?? json['total_cancels'] ?? 0,
       totalIncome: (metrics['total_earnings'] ?? json['total_income'] ?? 0).toInt(),
     );
   }

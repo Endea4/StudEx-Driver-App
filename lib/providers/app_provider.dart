@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../core/network/api_client.dart';
 import '../core/network/websocket_client.dart';
 import '../core/storage/local_storage.dart';
+import '../core/errors.dart';
 import '../services/auth_service.dart';
 import '../services/history_service.dart';
 import '../services/debt_service.dart';
@@ -33,11 +34,11 @@ class AppProvider extends ChangeNotifier {
   })  : apiClient = ApiClient(),
         wsClient = WebSocketClient() {
     authService = AuthService(apiClient, localStorage);
-    historyService = HistoryService(apiClient);
-    debtService = DebtService(apiClient);
-    ratingService = RatingService(apiClient);
-    reputationService = ReputationService(apiClient);
-    locationService = LocationService(localStorage);
+    historyService = HistoryService(apiClient, localStorage);
+    debtService = DebtService(apiClient, localStorage);
+    ratingService = RatingService(apiClient, localStorage);
+    reputationService = ReputationService(apiClient, localStorage);
+    locationService = LocationService(apiClient, localStorage);
 
     final token = localStorage.getToken();
     if (token != null && token.isNotEmpty) {
@@ -86,7 +87,7 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(friendlyError(e));
       return false;
     } finally {
       _setLoading(false);

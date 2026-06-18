@@ -22,7 +22,7 @@ class AuthService {
         _api.setToken(token);
         await _storage.saveToken(token);
       }
-      final driver = Driver.fromJson(data['driver'] ?? data);
+      final driver = Driver.fromJson(data['driver'] ?? data['user'] ?? data);
       if (driver.id.isNotEmpty) {
         await _storage.saveDriverId(driver.id);
       }
@@ -41,13 +41,11 @@ class AuthService {
 
   Future<Driver> getProfile() async {
     final phone = _phone();
-    final path = '${ApiConstants.driverMe}${phone != null ? '?phone=$phone' : ''}';
-    print('[PROFILE] GET $path');
+    if (phone == null) throw Exception('No phone stored');
+    final path = '${ApiConstants.driverMe}/$phone';
     final res = await _api.get(path);
-    print('[PROFILE] status=${res.statusCode} body=${res.body.length > 200 ? res.body.substring(0, 200) : res.body}');
     if (res.statusCode == 200) {
       final decoded = jsonDecode(res.body);
-      print('[PROFILE] decoded keys: ${decoded.keys.toList()}');
       return Driver.fromJson(decoded);
     } else {
       throw Exception('Failed to fetch profile');
@@ -56,14 +54,35 @@ class AuthService {
 
   Future<Driver> updateStatus(String status, {String? reason}) async {
     final phone = _phone();
-    final path = '${ApiConstants.driverStatus}${phone != null ? '?phone=$phone' : ''}';
-    final body = <String, dynamic>{'status': status};
+    final body = <String, dynamic>{'phone': phone, 'status': status};
     if (reason != null) body['reason'] = reason;
-    final res = await _api.put(path, body: body);
+    final res = await _api.put(ApiConstants.driverStatus, body: body);
     if (res.statusCode == 200) {
-      return Driver.fromJson(jsonDecode(res.body));
+      final updated = await getProfile();
+      return updated;
     } else {
       throw Exception('Failed to update status');
     }
+  }
+
+  Future<Driver> updateProfile(Map<String, dynamic> fields) async {
+    final phone = _phone();
+    if (phone == null) throw Exception('No phone stored');
+    final res = await _api.put('${ApiConstants.driverMe}/$phone', body: fields);
+    if (res.statusCode == 200) {
+      final updated = await getProfile();
+      return updated;
+    } else {
+      throw Exception('Failed to update profile');
+    }
+  }
+
+  Future<bool> changePassword(String newPassword) async {
+    final phone = _phone();
+    if (phone == null) throw Exception('No phone stored');
+    final res = await _api.put('${ApiConstants.driverMe}/$phone/password', body: {
+      'password': newPassword,
+    });
+    return res.statusCode == 200;
   }
 }

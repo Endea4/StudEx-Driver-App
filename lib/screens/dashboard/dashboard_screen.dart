@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
+import '../../core/theme.dart';
+import '../../core/format.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/driver_provider.dart';
+import '../../providers/history_provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,17 +16,39 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _gpsEnabled = false;
-  bool _showReasonDialog = false;
-  String _pendingStatus = '';
+  String _timeFilter = 'today';
   StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DriverProvider>().fetchProfile();
       _listenWsEvents();
+      _initAsync();
     });
+  }
+
+  Future<void> _initAsync() async {
+    await context.read<DriverProvider>().fetchProfile();
+    if (!mounted) return;
+    context.read<HistoryProvider>().fetchOrders();
+    _restoreGps();
+  }
+
+  Future<void> _restoreGps() async {
+    final app = context.read<AppProvider>();
+    final driver = context.read<DriverProvider>().driver;
+    final isReady = (driver?.status ?? '').toLowerCase() == 'ready';
+    final wasEnabled = app.localStorage.getGpsEnabled();
+    if (wasEnabled || isReady) {
+      final hasPermission = await app.locationService.checkPermissions();
+      if (hasPermission) {
+        app.locationService.startStreaming();
+        app.locationService.setGpsStatus(true);
+        app.localStorage.saveGpsEnabled(true);
+        setState(() => _gpsEnabled = true);
+      }
+    }
   }
 
   void _listenWsEvents() {
@@ -32,52 +57,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       final type = event['type'] as String? ?? '';
       if (type == 'match.completed') {
-        final data = event['data'] as Map<String, dynamic>? ?? {};
-        final orderId = data['order_id'] ?? '-';
-        final score = data['score'] ?? 0;
-        _showNotification(
-          'Pesanan Baru!',
-          'Order $orderId masuk (score: ${score.toStringAsFixed(2)})',
-          Icons.local_shipping,
-          Colors.blue,
-        );
+        _showNotification('Pesanan Baru!', 'Ada pesanan masuk', Icons.local_shipping, AppTheme.brandCyan);
       } else if (type == 'trip.created') {
-        final data = event['data'] as Map<String, dynamic>? ?? {};
-        final tripId = data['trip_id'] ?? '-';
-        _showNotification(
-          'Trip Dibuat',
-          'Trip $tripId menunggu konfirmasi',
-          Icons.assignment,
-          Colors.orange,
-        );
+        _showNotification('Trip Dibuat', 'Trip menunggu konfirmasi', Icons.assignment, AppTheme.warning);
       } else if (type == 'trip.started') {
-        _showNotification(
-          'Trip Dimulai',
-          'Perjalanan dimulai',
-          Icons.directions_bike,
-          Colors.green,
-        );
+        _showNotification('Trip Dimulai', 'Perjalanan dimulai', Icons.directions_bike, AppTheme.success);
       } else if (type == 'trip.completed') {
-        _showNotification(
-          'Trip Selesai',
-          'Perjalanan selesai',
-          Icons.check_circle,
-          Colors.teal,
-        );
+        _showNotification('Trip Selesai', 'Perjalanan selesai', Icons.check_circle, AppTheme.success);
       } else if (type == 'trip.cancelled') {
-        _showNotification(
-          'Trip Dibatalkan',
-          'Perjalanan dibatalkan',
-          Icons.cancel,
-          Colors.red,
-        );
+        _showNotification('Trip Dibatalkan', 'Perjalanan dibatalkan', Icons.cancel, AppTheme.danger);
       } else if (type == 'match.timeout') {
-        _showNotification(
-          'Match Timeout',
-          'Tidak ada driver tersedia',
-          Icons.timer_off,
-          Colors.grey,
-        );
+        _showNotification('Match Timeout', 'Tidak ada driver tersedia', Icons.timer_off, AppTheme.textMuted);
       }
     });
   }
@@ -87,39 +77,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
       SnackBar(
         content: Row(
           children: [
-            Icon(icon, color: Colors.white),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(body, style: const TextStyle(fontSize: 13)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
+                  Text(body, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                 ],
               ),
             ),
           ],
         ),
-        backgroundColor: color.withOpacity(0.9),
-        duration: const Duration(seconds: 4),
+        backgroundColor: AppTheme.surface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.surfaceBorder),
+        ),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
   Future<void> _toggleStatus(String status) async {
-    if (status == 'izin' || status == 'cuti') {
-      _pendingStatus = status;
-      _showReasonDialog = true;
+    if (status == 'ready' && !_gpsEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Nyalakan GPS terlebih dahulu sebelum Ready'),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
       return;
     }
-
     await context.read<DriverProvider>().updateStatus(status);
-  }
-
-  Future<void> _submitStatusWithReason(String reason) async {
-    Navigator.pop(context);
-    await context.read<DriverProvider>().updateStatus(_pendingStatus, reason: reason);
+    if (status == 'offline' && _gpsEnabled) {
+      _toggleGps();
+    }
   }
 
   Future<void> _toggleGps() async {
@@ -128,17 +134,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (_gpsEnabled) {
       locationService.stopStreaming();
+      locationService.setGpsStatus(false);
+      app.localStorage.saveGpsEnabled(false);
       setState(() => _gpsEnabled = false);
+      await context.read<DriverProvider>().updateStatus('offline');
     } else {
       final hasPermission = await locationService.checkPermissions();
       if (!hasPermission) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Izin lokasi ditolak')));
+            const SnackBar(content: Text('Izin lokasi ditolak')),
+          );
         }
         return;
       }
       locationService.startStreaming();
+      locationService.setGpsStatus(true);
+      app.localStorage.saveGpsEnabled(true);
       setState(() => _gpsEnabled = true);
     }
   }
@@ -146,18 +158,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.bg,
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Row(
+          children: [
+            const Text('StudEx', style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.5,
+            )),
+            const SizedBox(width: 4),
+            Text('Driver', style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w300,
+              color: AppTheme.accent,
+              letterSpacing: -0.3,
+            )),
+          ],
+        ),
         actions: [
-          IconButton(
-            key: const Key('logout_button'),
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await context.read<AppProvider>().logout();
-              if (mounted) {
+          Semantics(
+            label: 'logout_button',
+            child: IconButton(
+              icon: const Icon(Icons.logout_rounded, size: 22),
+              onPressed: () async {
+                await context.read<AppProvider>().logout();
+                if (!context.mounted) return;
                 Navigator.pushReplacementNamed(context, '/sign-in');
-              }
-            },
+              },
+            ),
           ),
         ],
       ),
@@ -166,27 +196,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final driver = driverProvider.driver;
 
           if (driverProvider.isLoading && driver == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: AppTheme.accent));
           }
 
           if (driver == null) {
-            return const Center(child: Text('Gagal memuat profil'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
+                  const SizedBox(height: 16),
+                  const Text('Gagal memuat profil', style: TextStyle(color: AppTheme.textSecondary)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => driverProvider.fetchProfile(),
+                    child: const Text('Coba Lagi'),
+                  ),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(
+            color: AppTheme.accent,
             onRefresh: () => driverProvider.fetchProfile(),
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               children: [
-                _buildProfileCard(driver),
-                const SizedBox(height: 16),
-                _buildStatusCard(driver),
+                _buildProfileHero(driver),
+                const SizedBox(height: 20),
+                _buildStatusSection(driver),
                 const SizedBox(height: 16),
                 _buildGpsCard(),
-                const SizedBox(height: 16),
-                _buildStatsCard(driver),
-                const SizedBox(height: 16),
-                _buildNavigationCards(),
+                const SizedBox(height: 24),
+                _buildStatsRow(driver, driverProvider),
+                const SizedBox(height: 28),
+                const SectionHeader(title: 'Menu'),
+                _buildNavigationList(),
+                const SizedBox(height: 32),
               ],
             ),
           );
@@ -195,22 +242,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProfileCard(dynamic driver) {
-    final hasPhoto = driver.profilePhoto.isNotEmpty;
-    return Card(
+  Widget _buildProfileHero(dynamic driver) {
+    final hasPhoto = driver.profilePhoto?.isNotEmpty == true;
+    return Semantics(
+      label: 'profile_card',
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(top: 8),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: Colors.blue.shade100,
-              backgroundImage: hasPhoto ? NetworkImage(driver.profilePhoto) : null,
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.brandCyan, AppTheme.brandCyanDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
               child: hasPhoto
-                  ? null
-                  : Text(
-                      driver.displayName.isNotEmpty ? driver.displayName[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.network(driver.profilePhoto, fit: BoxFit.cover),
+                    )
+                  : Center(
+                      child: Text(
+                        driver.displayName?.isNotEmpty == true
+                            ? driver.displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.brandNavy,
+                        ),
+                      ),
                     ),
             ),
             const SizedBox(width: 16),
@@ -218,11 +285,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Semantics(label: 'driver_name', child: Text(driver.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  Semantics(
+                    label: 'driver_name',
+                    child: Text(
+                      driver.displayName ?? '',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: -0.5,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(driver.vehicleType, style: const TextStyle(color: Colors.grey)),
-                  Text(driver.plateNumber, style: const TextStyle(color: Colors.grey)),
+                  if (driver.phone?.isNotEmpty == true)
+                    Text(
+                      driver.phone,
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                    ),
+                  const SizedBox(height: 4),
+                  if (driver.gender?.isNotEmpty == true)
+                    Row(
+                      children: [
+                        Icon(driver.gender.toLowerCase() == 'male' ? Icons.male : Icons.female,
+                            size: 14, color: AppTheme.textMuted),
+                        const SizedBox(width: 4),
+                        Text(driver.gender, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                      ],
+                    ),
+                  const SizedBox(height: 6),
+                  if (driver.vehicleType?.isNotEmpty == true || driver.plateNumber?.isNotEmpty == true)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.motorcycle, size: 14, color: AppTheme.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${driver.vehicleType ?? ''} ${driver.plateNumber ?? ''}'.trim(),
+                            style: const TextStyle(fontSize: 13, color: AppTheme.accent, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
+              ),
+            ),
+            // Edit profile button
+            Semantics(
+              label: 'edit_profile',
+              child: IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.textMuted),
+                onPressed: () => Navigator.pushNamed(context, '/profile'),
               ),
             ),
           ],
@@ -231,109 +352,338 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatusCard(dynamic driver) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Status: ${driver.status.toUpperCase()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _statusChip('Ready', 'ready', driver.status, Colors.green),
-                _statusChip('Offline', 'offline', driver.status, Colors.grey),
-                _statusChip('Izin', 'izin', driver.status, Colors.orange),
-                _statusChip('Cuti', 'cuti', driver.status, Colors.red),
-              ],
-            ),
-          ],
-        ),
+  Widget _buildStatusSection(dynamic driver) {
+    final status = (driver.status ?? 'offline').toLowerCase();
+    final isReady = status == 'ready';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: isReady ? AppTheme.success : AppTheme.textMuted,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                isReady ? 'Siap Menerima Pesanan' : 'Offline',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isReady ? AppTheme.success : AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _statusChip('Ready', 'ready', status, AppTheme.success)),
+              const SizedBox(width: 12),
+              Expanded(child: _statusChip('Offline', 'offline', status, AppTheme.textMuted)),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _statusChip(String label, String status, String currentStatus, Color color) {
-    final isSelected = currentStatus == status;
-    return ChoiceChip(
-      key: Key('status_$status'),
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: color.withOpacity(0.2),
-      onSelected: (_) => _toggleStatus(status),
+  Widget _statusChip(String label, String value, String current, Color color) {
+    final isSelected = current == value;
+    return GestureDetector(
+      onTap: () => _toggleStatus(value),
+      child: Semantics(
+        label: 'status_$value',
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.15) : AppTheme.surfaceLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color.withOpacity(0.4) : AppTheme.surfaceBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isSelected)
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? color : AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildGpsCard() {
-    return Card(
-      child: SwitchListTile(
-        key: const Key('gps_toggle'),
-        title: const Text('Bagikan Lokasi GPS'),
-        subtitle: Text(_gpsEnabled ? 'GPS aktif - lokasi dibagikan' : 'GPS nonaktif'),
-        secondary: Icon(
-          _gpsEnabled ? Icons.gps_fixed : Icons.gps_off,
-          color: _gpsEnabled ? Colors.green : Colors.grey,
+    return Semantics(
+      label: 'gps_card',
+      child: GestureDetector(
+        onTap: _toggleGps,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _gpsEnabled ? AppTheme.accent.withOpacity(0.08) : AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _gpsEnabled ? AppTheme.accent.withOpacity(0.3) : AppTheme.surfaceBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _gpsEnabled ? AppTheme.accent.withOpacity(0.15) : AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _gpsEnabled ? Icons.gps_fixed : Icons.gps_off,
+                  color: _gpsEnabled ? AppTheme.accent : AppTheme.textMuted,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _gpsEnabled ? 'GPS Aktif' : 'GPS Nonaktif',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _gpsEnabled ? AppTheme.accent : AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _gpsEnabled ? 'Lokasi dibagikan ke sistem' : 'Aktifkan untuk menerima pesanan',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                key: const Key('gps_toggle'),
+                value: _gpsEnabled,
+                onChanged: (_) => _toggleGps(),
+              ),
+            ],
+          ),
         ),
-        value: _gpsEnabled,
-        onChanged: (_) => _toggleGps(),
       ),
     );
   }
 
-  Widget _buildStatsCard(dynamic driver) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  // One-line stats with time filter
+  Widget _buildStatsRow(dynamic driver, DriverProvider driverProvider) {
+    final historyProvider = context.watch<HistoryProvider>();
+    final now = DateTime.now();
+    final cutoff = _timeFilter == 'today'
+        ? DateTime(now.year, now.month, now.day)
+        : _timeFilter == 'week'
+            ? now.subtract(Duration(days: now.weekday - 1))
+            : DateTime(now.year, now.month, 1);
+
+    final filtered = historyProvider.orders
+        .where((o) => o.createdAt.isAfter(cutoff) && o.status == 'completed')
+        .toList();
+    final income = filtered.fold<int>(0, (sum, o) => sum + o.finalPrice);
+    final orderCount = filtered.length;
+    final rating = driverProvider.reputationScore;
+
+    return Column(
+      children: [
+        Row(
           children: [
-            const Text('Statistik', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _statItem('Pesanan', '${driver.totalOrders}'),
-                _statItem('Rating', '${driver.reputationScore.toStringAsFixed(1)}'),
-                _statItem('Pendapatan', 'Rp ${driver.totalIncome}'),
-              ],
-            ),
+            _filterChip('Hari ini', 'today'),
+            const SizedBox(width: 8),
+            _filterChip('Minggu ini', 'week'),
+            const SizedBox(width: 8),
+            _filterChip('Bulan ini', 'month'),
           ],
         ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.surfaceBorder),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Pendapatan', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                    const SizedBox(height: 4),
+                    Text('Rp ${formatMoney(income)}',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.brandCyan, letterSpacing: -0.5)),
+                  ],
+                ),
+              ),
+              Container(width: 1, height: 36, color: AppTheme.surfaceBorder),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text('Pesanan', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      Text('$orderCount',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.5)),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 36, color: AppTheme.surfaceBorder),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('Rating', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, color: AppTheme.warning, size: 16),
+                        const SizedBox(width: 2),
+                        Text(rating.toStringAsFixed(1),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.warning, letterSpacing: -0.5)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip(String label, String value) {
+    final isSelected = _timeFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _timeFilter = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.accent.withOpacity(0.15) : AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppTheme.accent.withOpacity(0.4) : AppTheme.surfaceBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppTheme.accent : AppTheme.textMuted,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _statItem(String label, String value) {
+  Widget _statItem(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationList() {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        _navTile(Icons.history_rounded, 'Riwayat Pesanan', '/history', AppTheme.brandCyan),
+        const SizedBox(height: 8),
+        _navTile(Icons.money_off_rounded, 'Daftar Utang', '/debts', AppTheme.danger),
+        const SizedBox(height: 8),
+        _navTile(Icons.star_rate_rounded, 'Rating Menunggu', '/ratings', AppTheme.warning),
+        const SizedBox(height: 8),
+        _navTile(Icons.assessment_rounded, 'Reputasi', '/reputation', AppTheme.success),
       ],
     );
   }
 
-  Widget _buildNavigationCards() {
-    return Column(
-      children: [
-        _navCard(Icons.history, 'Riwayat Pesanan', '/history'),
-        _navCard(Icons.money_off, 'Daftar Utang', '/debts'),
-        _navCard(Icons.star_rate, 'Rating Menunggu', '/ratings'),
-        _navCard(Icons.assessment, 'Reputasi', '/reputation'),
-      ],
-    );
-  }
-
-  Widget _navCard(IconData icon, String title, String route) {
-    return Card(
+  Widget _navTile(IconData icon, String title, String route, Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
       child: ListTile(
         key: Key('nav_$route'),
-        leading: Icon(icon),
-        title: Semantics(label: 'nav_$title', child: Text(title)),
-        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Semantics(
+          label: 'nav_$title',
+          child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 20),
         onTap: () => Navigator.pushNamed(context, route),
       ),
     );
@@ -342,9 +692,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _wsSubscription?.cancel();
-    final app = context.read<AppProvider>();
-    app.locationService.stopStreaming();
-    app.wsClient.disconnect();
     super.dispose();
   }
 }

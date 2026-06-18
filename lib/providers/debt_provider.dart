@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/debt.dart';
 import '../services/debt_service.dart';
+import '../core/errors.dart';
 
 class DebtProvider extends ChangeNotifier {
   final DebtService _service;
@@ -23,10 +24,25 @@ class DebtProvider extends ChangeNotifier {
     try {
       _debts = await _service.getDebts();
     } catch (e) {
-      _error = e.toString();
+      _error = friendlyError(e);
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> confirmPaid(String debtId) async {
+    try {
+      final ok = await _service.confirmPaid(debtId);
+      if (ok) {
+        // Refresh list
+        await fetchDebts();
+      }
+      return ok;
+    } catch (e) {
+      _error = friendlyError(e);
+      notifyListeners();
+      return false;
     }
   }
 }

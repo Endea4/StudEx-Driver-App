@@ -57,16 +57,6 @@ class WebSocketClient {
     }
   }
 
-  void sendLocation(double lat, double lng) {
-    if (_channel != null) {
-      _channel!.sink.add(jsonEncode({
-        'latitude': lat,
-        'longitude': lng,
-        'timestamp': DateTime.now().toUtc().toIso8601String(),
-      }));
-    }
-  }
-
   void _scheduleReconnect([_]) {
     if (_disposed) return;
     _reconnectTimer?.cancel();

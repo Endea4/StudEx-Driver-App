@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/reputation.dart';
 import '../services/reputation_service.dart';
+import '../core/errors.dart';
 
 class ReputationProvider extends ChangeNotifier {
   final ReputationService _service;
@@ -22,7 +23,8 @@ class ReputationProvider extends ChangeNotifier {
     try {
       _reputation = await _service.getReputation();
     } catch (e) {
-      _error = e.toString();
+      _error = friendlyError(e);
+      _reputation = null;
     } finally {
       _isLoading = false;
       notifyListeners();

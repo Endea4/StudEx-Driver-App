@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/order.dart';
 import '../services/history_service.dart';
+import '../core/errors.dart';
 
 class HistoryProvider extends ChangeNotifier {
   final HistoryService _service;
@@ -22,7 +23,7 @@ class HistoryProvider extends ChangeNotifier {
     try {
       _orders = await _service.getOrders(limit: limit);
     } catch (e) {
-      _error = e.toString();
+      _error = friendlyError(e);
     } finally {
       _isLoading = false;
       notifyListeners();

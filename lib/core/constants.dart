@@ -6,9 +6,9 @@ class ApiConstants {
   static const String wsUrl = EnvConfig.wsUrl;
 
   static const String auth = '/drivers/auth';
-  static const String authLogout = '/drivers/auth/logout';
-  static const String driverMe = '/drivers/me';
-  static const String driverStatus = '/drivers/me/status';
+  static const String authLogout = '/auth/logout';
+  static const String driverMe = '/users';
+  static const String driverStatus = '/drivers/status';
   static const String locationUpdate = '/location';
   static const String driverDebts = '/drivers/debts';
   static const String driverRatingsPending = '/drivers/ratings/pending';

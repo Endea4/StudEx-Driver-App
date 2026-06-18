@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/pending_rating.dart';
 import '../services/rating_service.dart';
+import '../core/errors.dart';
 
 class RatingProvider extends ChangeNotifier {
   final RatingService _service;
@@ -25,7 +26,7 @@ class RatingProvider extends ChangeNotifier {
     try {
       _pendingRatings = await _service.getPendingRatings();
     } catch (e) {
-      _error = e.toString();
+      _error = friendlyError(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -41,7 +42,7 @@ class RatingProvider extends ChangeNotifier {
       await fetchPendingRatings();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = friendlyError(e);
       return false;
     } finally {
       _isSubmitting = false;
