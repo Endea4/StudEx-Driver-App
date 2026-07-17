@@ -20,6 +20,7 @@ import 'screens/reputation/reputation_screen.dart';
 import 'screens/profile/profile_edit_screen.dart';
 import 'screens/settings/change_password_screen.dart';
 import 'screens/trip/trip_detail_screen.dart';
+import 'screens/ride/ride_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final ValueNotifier<Map<String, String>?> testLoginNotifier = ValueNotifier(null);
@@ -92,6 +93,7 @@ class StudExApp extends StatelessWidget {
         '/reputation': (_) => const ReputationScreen(),
         '/profile': (_) => const ProfileEditScreen(),
         '/change-password': (_) => const ChangePasswordScreen(),
+        '/ride': (_) => const RideScreen(),
         '/trip': (ctx) {
           final tripId = ModalRoute.of(ctx)!.settings.arguments as String;
           return TripDetailScreen(tripId: tripId);

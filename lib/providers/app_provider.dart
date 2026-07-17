@@ -25,6 +25,15 @@ class AppProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Latest incoming ride offer received via WS
+  Map<String, dynamic>? _latestRideOffer;
+  Map<String, dynamic>? get latestRideOffer => _latestRideOffer;
+  void setLatestRideOffer(Map<String, dynamic>? offer) {
+    _latestRideOffer = offer;
+    notifyListeners();
+  }
+  void clearLatestOffer() { _latestRideOffer = null; }
+
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get error => _error;

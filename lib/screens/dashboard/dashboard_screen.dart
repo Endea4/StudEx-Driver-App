@@ -58,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final type = event['type'] as String? ?? '';
       if (type == 'match.completed') {
         _showNotification('Pesanan Baru!', 'Ada pesanan masuk', Icons.local_shipping, AppTheme.brandCyan);
+        context.read<AppProvider>().setLatestRideOffer(event['data'] as Map<String, dynamic>?);
       } else if (type == 'trip.created') {
         _showNotification('Trip Dibuat', 'Trip menunggu konfirmasi', Icons.assignment, AppTheme.warning);
       } else if (type == 'trip.started') {
@@ -649,6 +650,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildNavigationList() {
     return Column(
       children: [
+        _navTile(Icons.directions_bike, 'Ride', '/ride', AppTheme.accent),
+        const SizedBox(height: 8),
         _navTile(Icons.history_rounded, 'Riwayat Pesanan', '/history', AppTheme.brandCyan),
         const SizedBox(height: 8),
         _navTile(Icons.money_off_rounded, 'Daftar Utang', '/debts', AppTheme.danger),
