@@ -226,6 +226,7 @@ class _RideScreenState extends State<RideScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.surfaceBorder)),
       child: ListTile(
+        onTap: () => _onTripTap(trip),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           width: 40, height: 40,
@@ -413,7 +414,7 @@ class _RideScreenState extends State<RideScreen> {
               onPressed: () {
                 final amount = double.tryParse(_bidController.text) ?? 0;
                 if (amount > 0) {
-                  _provider.submitBid(amount);
+                  _provider.submitBid(amount, reason: _bidReasonController.text);
                   setState(() => _showBid = false);
                   _bidController.clear();
                   _bidReasonController.clear();
@@ -458,7 +459,11 @@ class _RideScreenState extends State<RideScreen> {
         const Text('Penumpang meminta bid', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         if (_trip != null && _trip!.currentBidPrice > 0) ...[
           const SizedBox(height: 8),
-          Text('Bid saat ini: Rp ${formatMoney(_trip!.currentBidPrice.toInt())}', style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+          Text('Bid saat ini: Rp ${formatMoney(_trip!.currentBidPrice.toInt())}${_trip!.lastBidder != null ? " oleh ${_trip!.lastBidder}" : ""}', style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+          if (_trip!.reason != null && _trip!.reason!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Alasan: ${_trip!.reason}', style: const TextStyle(fontSize: 12, color: AppTheme.warning, fontStyle: FontStyle.italic)),
+          ],
         ],
         const SizedBox(height: 16),
         TextField(
@@ -470,10 +475,18 @@ class _RideScreenState extends State<RideScreen> {
           child: ElevatedButton(
             onPressed: () {
               final amount = double.tryParse(_bidController.text) ?? 0;
-              if (amount > 0) _provider.submitBid(amount);
+              if (amount > 0) _provider.submitBid(amount, reason: _bidReasonController.text);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warning, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             child: const Text('Kirim Bid', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, height: 48,
+          child: ElevatedButton(
+            onPressed: () => _provider.acceptDeal(),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            child: const Text('Terima Harga', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           ),
         ),
       ]),
@@ -546,6 +559,92 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  void _onTripTap(Map<String, dynamic> trip) {
+    final status = trip['status'] ?? '';
+    final color = _statusColor(status);
+    final label = _statusLabel(status);
+
+    if (status == 'pending_acceptance' || status == 'bargaining') {
+      _provider.testSimulateOfferFromData({
+        'order_id': trip['order_id'] ?? '',
+        'pickup_lat': trip['pickup_lat'] ?? 0,
+        'pickup_lng': trip['pickup_lng'] ?? 0,
+        'dest_lat': trip['dest_lat'] ?? 0,
+        'dest_lng': trip['dest_lng'] ?? 0,
+        'estimated_price': trip['final_price'] ?? trip['current_bid_price'] ?? 0,
+        'score': 0,
+        'request_id': trip['request_id'] ?? '',
+        'customer_ref_id': trip['customer_ref_id'] ?? '',
+        'service_type': trip['service_type'] ?? 'anjem',
+        'driver_ref_id': trip['driver_ref_id'] ?? '',
+      });
+    } else if (status == 'accepted' || status == 'in_progress') {
+      _provider.resumeActiveTrip({
+        'id': trip['id'] ?? '',
+        'order_id': trip['order_id'] ?? '',
+        'status': status,
+        'pickup_lat': trip['pickup_lat'] ?? 0,
+        'pickup_lng': trip['pickup_lng'] ?? 0,
+        'dest_lat': trip['dest_lat'] ?? 0,
+        'dest_lng': trip['dest_lng'] ?? 0,
+        'final_price': trip['final_price'] ?? trip['current_bid_price'] ?? 0,
+        'service_type': trip['service_type'] ?? 'anjem',
+        'driver_ref_id': trip['driver_ref_id'] ?? '',
+        'customer_ref_id': trip['customer_ref_id'] ?? '',
+      });
+    } else {
+      _showTripDetailDialog(trip, label, color);
+    }
+  }
+
+  void _showTripDetailDialog(Map<String, dynamic> trip, String label, Color color) {
+    final price = (trip['final_price'] ?? 0).toInt();
+    final bid = (trip['current_bid_price'] ?? 0).toInt();
+    final pl = trip['pickup_lat'] ?? 0;
+    final plng = trip['pickup_lng'] ?? 0;
+    final dl = trip['dest_lat'] ?? 0;
+    final dlng = trip['dest_lng'] ?? 0;
+    final ts = trip['updated_at'] ?? trip['created_at'] ?? '';
+    final tsShort = ts.toString().length > 19 ? ts.toString().substring(0, 19) : ts.toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              width: 12, height: 12,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _detailRow('Order', trip['order_id'] ?? ''),
+            if (trip['id'] != null) _detailRow('Trip ID', trip['id'] ?? ''),
+            _detailRow('Status', label),
+            _detailRow('Harga', 'Rp ${formatMoney(price)}'),
+            if (bid > 0) _detailRow('Bid', 'Rp ${formatMoney(bid)}'),
+            _detailRow('Pickup', '${pl.toStringAsFixed(4)}, ${plng.toStringAsFixed(4)}'),
+            _detailRow('Dropoff', '${dl.toStringAsFixed(4)}, ${dlng.toStringAsFixed(4)}'),
+            if (tsShort.isNotEmpty) _detailRow('Waktu', tsShort),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showRejectDialog() {
     final reasonController = TextEditingController();
     showDialog(
@@ -584,6 +683,14 @@ class _RideScreenState extends State<RideScreen> {
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
       Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+    ]),
+  );
+
+  Widget _detailRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
+      Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, fontFamily: 'monospace'))),
     ]),
   );
 

@@ -52,8 +52,10 @@ class RideProvider extends ChangeNotifier {
 
         case 'trip.created':
           _activeTrip = ActiveTrip.fromJson(data);
-          _state = RideState.active;
-          _currentOffer = null;
+          if (_state != RideState.offer) {
+            _state = RideState.active;
+            _currentOffer = null;
+          }
           _error = null;
           notifyListeners();
           break;
@@ -166,11 +168,26 @@ class RideProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> submitBid(double amount) async {
+  Future<bool> submitBid(double amount, {String reason = ''}) async {
     if (_activeTrip == null) return false;
     _setLoading(true);
     try {
-      _activeTrip = await rideService.submitBid(_activeTrip!.id, amount);
+      _activeTrip = await rideService.submitBid(_activeTrip!.id, amount, reason: reason);
+      _state = RideState.active;
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> acceptDeal() async {
+    if (_activeTrip == null) return false;
+    _setLoading(true);
+    try {
+      _activeTrip = await rideService.dealTrip(_activeTrip!.id);
       _state = RideState.active;
       return true;
     } catch (e) {
@@ -202,6 +219,14 @@ class RideProvider extends ChangeNotifier {
   void testSimulateOfferFromData(Map<String, dynamic> data) {
     _currentOffer = RideOffer.fromJson(data);
     _state = RideState.offer;
+    _error = null;
+    notifyListeners();
+  }
+
+  void resumeActiveTrip(Map<String, dynamic> data) {
+    _activeTrip = ActiveTrip.fromJson(data);
+    _state = RideState.active;
+    _currentOffer = null;
     _error = null;
     notifyListeners();
   }

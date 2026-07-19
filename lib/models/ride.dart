@@ -51,6 +51,7 @@ class ActiveTrip {
   final double finalPrice;
   final double currentBidPrice;
   final String? lastBidder;
+  final String? reason;
   final String paymentStatus;
 
   ActiveTrip({
@@ -65,6 +66,7 @@ class ActiveTrip {
     this.finalPrice = 0,
     this.currentBidPrice = 0,
     this.lastBidder,
+    this.reason,
     this.paymentStatus = '',
   });
 
@@ -81,6 +83,7 @@ class ActiveTrip {
       finalPrice: (json['final_price'] ?? 0).toDouble(),
       currentBidPrice: (json['current_bid_price'] ?? 0).toDouble(),
       lastBidder: json['last_bidder'],
+      reason: json['reason'],
       paymentStatus: json['payment_status'] ?? '',
     );
   }

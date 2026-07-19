@@ -1,9 +1,9 @@
 const BACKEND_HOST = process.env.BACKEND_HOST || '100.85.144.5';
-const MATCHING_URL = `http://${BACKEND_HOST}:8084`;
+const MATCHING_URL = `http://${BACKEND_HOST}:9084`;
 const LOCATION_URL = `http://${BACKEND_HOST}:9081`;
 const AUTH_URL = `http://${BACKEND_HOST}:9080`;
-const TEST_PHONE = '6281234567890';
-const TEST_PASSWORD = 'password123';
+const TEST_PHONE = '6285331886336';
+const TEST_PASSWORD = '6285331886336';
 
 let driverRefId = '';
 
@@ -43,7 +43,11 @@ describe('StudEx Driver App - Matchmaking', () => {
     });
     if (authRes.ok) {
       const authData = await authRes.json() as any;
-      driverRefId = authData.driver?.id || '';
+      console.log('authRes JSON:', authData);
+      driverRefId = authData.user?.id || authData.driver?.id || '';
+      console.log('driverRefId is now:', driverRefId);
+    } else {
+      console.log('authRes not OK:', authRes.status, await authRes.text());
     }
   });
 

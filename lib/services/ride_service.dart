@@ -55,13 +55,23 @@ class RideService {
     throw Exception('Gagal menyelesaikan trip: ${res.body}');
   }
 
-  Future<ActiveTrip> submitBid(String tripId, double amount) async {
+  Future<ActiveTrip> submitBid(String tripId, double amount, {String reason = '', String bidderRole = 'driver'}) async {
     final res = await _api.put('/trips/$tripId/bid', body: {
-      'bid_price': amount,
+      'amount': amount,
+      'reason': reason,
+      'bidder_role': bidderRole,
     });
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
     throw Exception('Gagal mengirim bid: ${res.body}');
+  }
+
+  Future<ActiveTrip> dealTrip(String tripId) async {
+    final res = await _api.put('/trips/$tripId/deal');
+    if (res.statusCode == 200) {
+      return ActiveTrip.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Gagal menerima harga: ${res.body}');
   }
 }

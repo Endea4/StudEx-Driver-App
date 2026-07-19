@@ -26,6 +26,7 @@ export const config: Options.Testrunner = {
     'appium:settings[waitForIdleTimeout]': 0,
     'appium:settings[waitForSelectorTimeout]': 0,
     'appium:settings[scrollAcknowledgmentTimeout]': 200,
+    'appium:ignoreHiddenApiPolicyError': true,
   }],
   services: [],
   logLevel: 'warn',
