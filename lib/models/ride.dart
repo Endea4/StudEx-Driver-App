@@ -87,4 +87,20 @@ class ActiveTrip {
       paymentStatus: json['payment_status'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'order_id': orderId,
+    'status': status,
+    'service_type': serviceType,
+    'pickup_lat': pickupLat,
+    'pickup_lng': pickupLng,
+    'dest_lat': destLat,
+    'dest_lng': destLng,
+    'final_price': finalPrice,
+    'current_bid_price': currentBidPrice,
+    'last_bidder': lastBidder,
+    'reason': reason,
+    'payment_status': paymentStatus,
+  };
 }

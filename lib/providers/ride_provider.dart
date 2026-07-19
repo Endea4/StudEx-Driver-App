@@ -70,7 +70,7 @@ class RideProvider extends ChangeNotifier {
 
         case 'trip.completed':
           if (_activeTrip != null) {
-            _activeTrip = ActiveTrip.fromJson(data);
+            _activeTrip = ActiveTrip.fromJson({...data, 'id': _activeTrip!.id, 'orderId': _activeTrip!.orderId});
           }
           _state = RideState.completed;
           notifyListeners();
@@ -78,7 +78,7 @@ class RideProvider extends ChangeNotifier {
 
         case 'trip.bargaining':
           if (_activeTrip != null) {
-            _activeTrip = ActiveTrip.fromJson(data);
+            _activeTrip = ActiveTrip.fromJson({...data, 'id': _activeTrip!.id, 'orderId': _activeTrip!.orderId});
           }
           _state = RideState.bidRequest;
           notifyListeners();
@@ -230,6 +230,16 @@ class RideProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  void resumeBidRequest(Map<String, dynamic> data) {
+    _activeTrip = ActiveTrip.fromJson(data);
+    _state = RideState.bidRequest;
+    _currentOffer = null;
+    _error = null;
+    notifyListeners();
+  }
+
+  void reset() => _reset();
 
   void _reset() {
     _state = RideState.idle;

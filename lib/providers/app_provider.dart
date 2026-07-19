@@ -34,6 +34,13 @@ class AppProvider extends ChangeNotifier {
   }
   void clearLatestOffer() { _latestRideOffer = null; }
 
+  Map<String, dynamic>? _activeRideState;
+  Map<String, dynamic>? getActiveRideState() => _activeRideState;
+  void saveRideState(String state, Map<String, dynamic>? tripData) {
+    _activeRideState = {'state': state, 'trip': tripData};
+  }
+  void clearRideState() { _activeRideState = null; }
+
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get error => _error;

@@ -39,6 +39,20 @@ class _RideScreenState extends State<RideScreen> {
     _provider = RideProvider(app.apiClient, app.wsClient, app.localStorage);
     _provider.addListener(_onProviderChanged);
 
+    final saved = app.getActiveRideState();
+    if (saved != null) {
+      final st = saved['state'] as String? ?? '';
+      final trip = saved['trip'] as Map<String, dynamic>?;
+      if (trip != null) {
+        if (st == 'bidRequest') {
+          _provider.resumeBidRequest(trip);
+        } else {
+          _provider.resumeActiveTrip(trip);
+        }
+      }
+      return;
+    }
+
     final offer = app.latestRideOffer;
     if (offer != null) {
       _provider.testSimulateOfferFromData(offer);
@@ -73,6 +87,14 @@ class _RideScreenState extends State<RideScreen> {
 
   @override
   void dispose() {
+    final app = context.read<AppProvider>();
+    if (_state == RideState.active || _state == RideState.bidRequest || _state == RideState.completed) {
+      if (_trip != null) {
+        app.saveRideState(_state.name, _trip!.toJson());
+      }
+    } else {
+      app.clearRideState();
+    }
     _bidController.dispose();
     _bidReasonController.dispose();
     _provider.removeListener(_onProviderChanged);
@@ -91,15 +113,21 @@ class _RideScreenState extends State<RideScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          if (_state != RideState.idle)
+          if (_state == RideState.offer)
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: () => _showRejectDialog(),
+              tooltip: 'Cancel',
+            ),
+          if (_state == RideState.completed)
             IconButton(
               icon: const Icon(Icons.close, size: 20),
               onPressed: () {
-                _provider.rejectOffer();
-                context.read<AppProvider>().clearLatestOffer();
-                setState(() { _state = RideState.idle; _offer = null; });
+                _provider.reset();
+                context.read<AppProvider>().clearRideState();
+                setState(() { _state = RideState.idle; _offer = null; _trip = null; });
               },
-              tooltip: 'Cancel',
+              tooltip: 'Tutup',
             ),
         ],
       ),
@@ -249,7 +277,7 @@ class _RideScreenState extends State<RideScreen> {
   Color _statusColor(String status) {
     switch (status) {
       case 'pending_acceptance': case 'bargaining': return AppTheme.warning;
-      case 'accepted': case 'in_progress': return AppTheme.accent;
+      case 'accepted': case 'in_progress': case 'deal': return AppTheme.accent;
       case 'completed': return AppTheme.success;
       case 'rejected': case 'cancelled': return AppTheme.danger;
       default: return AppTheme.textMuted;
@@ -262,6 +290,7 @@ class _RideScreenState extends State<RideScreen> {
       case 'bargaining': return 'Negosiasi';
       case 'accepted': return 'Diterima';
       case 'in_progress': return 'Berjalan';
+      case 'deal': return 'Deal';
       case 'completed': return 'Selesai';
       case 'rejected': return 'Ditolak';
       case 'cancelled': return 'Batal';
@@ -275,6 +304,7 @@ class _RideScreenState extends State<RideScreen> {
       case 'bargaining': return Icons.gavel;
       case 'accepted': return Icons.check_circle;
       case 'in_progress': return Icons.directions_bike;
+      case 'deal': return Icons.handshake;
       case 'completed': return Icons.check_circle_outline;
       case 'rejected': return Icons.close;
       case 'cancelled': return Icons.cancel;
@@ -354,7 +384,7 @@ class _RideScreenState extends State<RideScreen> {
           if (trip.finalPrice > 0) _infoRow('Harga', 'Rp ${formatMoney(trip.finalPrice.toInt())}'),
         ]),
         const SizedBox(height: 24),
-        if (trip.status == 'created' || trip.status == 'pending' || trip.status == 'accepted') ...[
+        if (trip.status == 'created' || trip.status == 'pending' || trip.status == 'accepted' || trip.status == 'deal') ...[
           _buildActionButton('Mulai Perjalanan', Icons.play_arrow, AppTheme.accent, () => _provider.startTrip()),
           const SizedBox(height: 12),
           if (!_showBid)
@@ -549,7 +579,7 @@ class _RideScreenState extends State<RideScreen> {
     Color color; String label; IconData icon;
     switch (status) {
       case 'in_progress': color = AppTheme.accent; label = 'Perjalanan Sedang Berlangsung'; icon = Icons.directions_bike; break;
-      case 'created': case 'pending': case 'accepted': color = AppTheme.warning; label = 'Menunggu Dimulai'; icon = Icons.hourglass_empty; break;
+      case 'deal': color = AppTheme.success; label = 'Harga Disetujui'; icon = Icons.handshake; break;
       default: color = AppTheme.textMuted; label = status; icon = Icons.info;
     }
     return Container(
@@ -578,7 +608,7 @@ class _RideScreenState extends State<RideScreen> {
         'service_type': trip['service_type'] ?? 'anjem',
         'driver_ref_id': trip['driver_ref_id'] ?? '',
       });
-    } else if (status == 'accepted' || status == 'in_progress') {
+    } else if (status == 'accepted' || status == 'in_progress' || status == 'deal') {
       _provider.resumeActiveTrip({
         'id': trip['id'] ?? '',
         'order_id': trip['order_id'] ?? '',
