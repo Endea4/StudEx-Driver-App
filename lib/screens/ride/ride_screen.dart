@@ -594,7 +594,7 @@ class _RideScreenState extends State<RideScreen> {
     final color = _statusColor(status);
     final label = _statusLabel(status);
 
-    if (status == 'pending_acceptance' || status == 'bargaining') {
+    if (status == 'pending_acceptance') {
       _provider.testSimulateOfferFromData({
         'order_id': trip['order_id'] ?? '',
         'pickup_lat': trip['pickup_lat'] ?? 0,
@@ -607,6 +607,23 @@ class _RideScreenState extends State<RideScreen> {
         'customer_ref_id': trip['customer_ref_id'] ?? '',
         'service_type': trip['service_type'] ?? 'anjem',
         'driver_ref_id': trip['driver_ref_id'] ?? '',
+      });
+    } else if (status == 'bargaining') {
+      _provider.resumeBidRequest({
+        'id': trip['id'] ?? '',
+        'order_id': trip['order_id'] ?? '',
+        'status': status,
+        'pickup_lat': trip['pickup_lat'] ?? 0,
+        'pickup_lng': trip['pickup_lng'] ?? 0,
+        'dest_lat': trip['dest_lat'] ?? 0,
+        'dest_lng': trip['dest_lng'] ?? 0,
+        'final_price': trip['final_price'] ?? trip['current_bid_price'] ?? 0,
+        'current_bid_price': trip['current_bid_price'] ?? 0,
+        'last_bidder': trip['last_bidder'] ?? '',
+        'reason': trip['reason'] ?? '',
+        'service_type': trip['service_type'] ?? 'anjem',
+        'driver_ref_id': trip['driver_ref_id'] ?? '',
+        'customer_ref_id': trip['customer_ref_id'] ?? '',
       });
     } else if (status == 'accepted' || status == 'in_progress' || status == 'deal') {
       _provider.resumeActiveTrip({

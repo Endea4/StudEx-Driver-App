@@ -198,24 +198,6 @@ class RideProvider extends ChangeNotifier {
     }
   }
 
-  void testSimulateOffer() {
-    _currentOffer = RideOffer(
-      orderId: 'test-001',
-      requestId: 'req-001',
-      customerRefId: 'cust123',
-      serviceType: 'anjem',
-      pickupLat: -7.558,
-      pickupLng: 110.827,
-      destLat: -7.768,
-      destLng: 110.839,
-      estimatedPrice: 15000,
-      score: 0.95,
-    );
-    _state = RideState.offer;
-    _error = null;
-    notifyListeners();
-  }
-
   void testSimulateOfferFromData(Map<String, dynamic> data) {
     _currentOffer = RideOffer.fromJson(data);
     _state = RideState.offer;
