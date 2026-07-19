@@ -1,8 +1,8 @@
 class EnvConfig {
   static const String serverUrl = String.fromEnvironment('SERVER_URL',
-      defaultValue: 'http://100.83.68.76:9080');
+      defaultValue: 'https://ag-studex.izcy.tech');
   static const String realtimeUrl = String.fromEnvironment('REALTIME_URL',
-      defaultValue: 'http://100.83.68.76:9081');
+      defaultValue: 'https://rg-studex.izcy.tech');
   static const String wsUrl = String.fromEnvironment('WS_URL',
-      defaultValue: 'ws://100.83.68.76:9081');
+      defaultValue: 'wss://rg-studex.izcy.tech/ws');
 }

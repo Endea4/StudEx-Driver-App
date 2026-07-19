@@ -1,5 +1,5 @@
 {
-  "SERVER_URL": "http://100.83.68.76:9080",
-  "REALTIME_URL": "http://100.83.68.76:9081",
-  "WS_URL": "ws://100.83.68.76:9081"
+  "SERVER_URL": "https://ag-studex.izcy.tech",
+  "REALTIME_URL": "https://rg-studex.izcy.tech",
+  "WS_URL": "wss://rg-studex.izcy.tech/ws"
 }
