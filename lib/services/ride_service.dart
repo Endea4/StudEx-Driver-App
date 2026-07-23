@@ -45,10 +45,13 @@ class RideService {
     throw Exception('Gagal memulai trip: ${res.body}');
   }
 
-  Future<ActiveTrip> completeTrip(String tripId, {String paymentStatus = 'paid'}) async {
-    final res = await _api.put('/trips/$tripId/complete', body: {
-      'payment_status': paymentStatus,
-    });
+  Future<ActiveTrip> completeTrip(String tripId,
+      {String paymentStatus = 'paid', double debtAmount = 0}) async {
+    final body = <String, dynamic>{'payment_status': paymentStatus};
+    if (paymentStatus == 'debt' && debtAmount > 0) {
+      body['debt_amount'] = debtAmount;
+    }
+    final res = await _api.put('/trips/$tripId/complete', body: body);
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }

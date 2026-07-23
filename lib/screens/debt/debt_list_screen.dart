@@ -81,7 +81,7 @@ class _DebtListScreenState extends State<DebtListScreen> {
                     Container(
                       width: 80, height: 80,
                       decoration: BoxDecoration(
-                        color: AppTheme.success.withOpacity(0.1),
+                        color: AppTheme.success.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.check_circle_outline, color: AppTheme.success, size: 40),
@@ -105,17 +105,17 @@ class _DebtListScreenState extends State<DebtListScreen> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppTheme.danger.withOpacity(0.15), AppTheme.danger.withOpacity(0.05)],
+                    colors: [AppTheme.danger.withValues(alpha: 0.15), AppTheme.danger.withValues(alpha: 0.05)],
                     begin: Alignment.topLeft, end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.danger.withOpacity(0.2)),
+                  border: Border.all(color: AppTheme.danger.withValues(alpha: 0.2)),
                 ),
                 child: Row(children: [
                   Container(
                     width: 48, height: 48,
                     decoration: BoxDecoration(
-                      color: AppTheme.danger.withOpacity(0.15),
+                      color: AppTheme.danger.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 24),
@@ -148,13 +148,9 @@ class _DebtListScreenState extends State<DebtListScreen> {
                         }
                       },
                       child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
+                      margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.surfaceBorder),
-                      ),
+                      decoration: AppTheme.cardDecoration(radius: AppTheme.radiusMd),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -162,7 +158,7 @@ class _DebtListScreenState extends State<DebtListScreen> {
                             Container(
                               width: 40, height: 40,
                               decoration: BoxDecoration(
-                                color: AppTheme.warning.withOpacity(0.12),
+                                color: AppTheme.warning.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(Icons.receipt_long, color: AppTheme.warning, size: 18),
@@ -173,8 +169,8 @@ class _DebtListScreenState extends State<DebtListScreen> {
                                 Text('Rp ${formatMoney(debt.amount)}',
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                                 const SizedBox(height: 2),
-                                Text('Order: ${debt.orderNumber.isNotEmpty ? debt.orderNumber.substring(0, debt.orderNumber.length > 12 ? 12 : debt.orderNumber.length) : debt.orderId}',
-                                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontFamily: 'monospace')),
+                                Text('Kode Order ${shortCode(debt.orderNumber.isNotEmpty ? debt.orderNumber : debt.orderId)}',
+                                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
                                 if (debt.description.isNotEmpty)
                                   Text(debt.description,
                                       style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
@@ -224,7 +220,7 @@ class _DebtListScreenState extends State<DebtListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.warning_amber_rounded, color: AppTheme.danger.withOpacity(0.6), size: 56),
+            Icon(Icons.warning_amber_rounded, color: AppTheme.danger.withValues(alpha: 0.6), size: 56),
             const SizedBox(height: 20),
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const SizedBox(height: 8),

@@ -25,7 +25,11 @@ class WebSocketClient {
   void connect() {
     if (_disposed || _token == null) return;
 
-    final uri = Uri.parse('${ApiConstants.wsUrl}/ws');
+    // WS_URL already points at the realtime-gateway's /ws endpoint; only
+    // append /ws if the configured URL doesn't already end with it.
+    final base = ApiConstants.wsUrl;
+    final wsUrl = base.endsWith('/ws') ? base : '$base/ws';
+    final uri = Uri.parse(wsUrl);
     _channel = WebSocketChannel.connect(
       uri,
       protocols: [_token!],

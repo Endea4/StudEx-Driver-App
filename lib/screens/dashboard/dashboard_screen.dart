@@ -82,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 18),
@@ -320,9 +320,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: AppTheme.accent.withOpacity(0.1),
+                        color: AppTheme.accent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
+                        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -357,12 +357,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final status = (driver.status ?? 'offline').toLowerCase();
     final isReady = status == 'ready';
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -409,10 +405,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.15) : AppTheme.surfaceLight,
+            color: isSelected ? color.withValues(alpha: 0.15) : AppTheme.surfaceLight,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? color.withOpacity(0.4) : AppTheme.surfaceBorder,
+              color: isSelected ? color.withValues(alpha: 0.4) : AppTheme.surfaceBorder,
             ),
           ),
           child: Row(
@@ -449,14 +445,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       label: 'gps_card',
       child: GestureDetector(
         onTap: _toggleGps,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _gpsEnabled ? AppTheme.accent.withOpacity(0.08) : AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
+            color: _gpsEnabled ? AppTheme.accent.withValues(alpha: 0.08) : AppTheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             border: Border.all(
-              color: _gpsEnabled ? AppTheme.accent.withOpacity(0.3) : AppTheme.surfaceBorder,
+              color: _gpsEnabled ? AppTheme.accent.withValues(alpha: 0.35) : AppTheme.surfaceBorder,
             ),
+            boxShadow: _gpsEnabled ? null : AppTheme.shadowSm,
           ),
           child: Row(
             children: [
@@ -464,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: _gpsEnabled ? AppTheme.accent.withOpacity(0.15) : AppTheme.surfaceLight,
+                  color: _gpsEnabled ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surfaceLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -536,12 +534,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.surfaceBorder),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+          decoration: AppTheme.cardDecoration(),
           child: Row(
             children: [
               Expanded(
@@ -606,10 +600,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accent.withOpacity(0.15) : AppTheme.surfaceLight,
+          color: isSelected ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surfaceLight,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppTheme.accent.withOpacity(0.4) : AppTheme.surfaceBorder,
+            color: isSelected ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.surfaceBorder,
           ),
         ),
         child: Text(
@@ -665,11 +659,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _navTile(IconData icon, String title, String route, Color color) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+      decoration: AppTheme.cardDecoration(radius: AppTheme.radiusMd),
       child: ListTile(
         key: Key('nav_$route'),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -677,7 +667,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 20),

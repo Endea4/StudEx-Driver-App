@@ -15,4 +15,9 @@ class ApiConstants {
   static const String driverRatings = '/drivers/ratings';
   static const String driverOrders = '/drivers/orders';
   static const String driverReputation = '/drivers/reputation';
+
+  // Chat / message-service (bridged to the customer's WhatsApp)
+  static String chatRoom(String tripId) => '/messages/rooms/$tripId';
+  static String chatSend(String tripId) => '/messages/rooms/$tripId/send';
+  static String chatOpen(String tripId) => '/messages/rooms/$tripId/open';
 }

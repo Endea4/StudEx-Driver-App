@@ -10,6 +10,9 @@ import 'providers/history_provider.dart';
 import 'providers/debt_provider.dart';
 import 'providers/rating_provider.dart';
 import 'providers/reputation_provider.dart';
+import 'providers/chat_provider.dart';
+import 'services/chat_service.dart';
+import 'screens/chat/chat_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -57,6 +60,12 @@ void main() async {
         ChangeNotifierProvider(
           create: (_) => ReputationProvider(appProvider.reputationService),
         ),
+        ChangeNotifierProvider(
+          create: (_) => ChatProvider(
+            ChatService(appProvider.apiClient),
+            appProvider.wsClient,
+          ),
+        ),
       ],
       child: const StudExApp(),
     ),
@@ -71,6 +80,19 @@ void main() async {
       }
     }
   });
+
+  // E2E test hook: if the app was launched via the TEST_LOGIN intent, pull the
+  // credentials from the native side and feed the sign-in screen.
+  try {
+    final pending = await channel.invokeMethod('getPendingLogin');
+    if (pending is Map) {
+      final phone = pending['phone']?.toString() ?? '';
+      final password = pending['password']?.toString() ?? '';
+      if (phone.isNotEmpty && password.isNotEmpty) {
+        testLoginNotifier.value = {'phone': phone, 'password': password};
+      }
+    }
+  } catch (_) {}
 }
 
 class StudExApp extends StatelessWidget {
@@ -94,6 +116,16 @@ class StudExApp extends StatelessWidget {
         '/profile': (_) => const ProfileEditScreen(),
         '/change-password': (_) => const ChangePasswordScreen(),
         '/ride': (_) => const RideScreen(),
+        '/chat': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments as Map<String, dynamic>;
+          return ChatScreen(
+            tripId: args['tripId'] as String,
+            driverRefId: (args['driverRefId'] as String?) ?? '',
+            customerRefId: (args['customerRefId'] as String?) ?? '',
+            orderId: (args['orderId'] as String?) ?? '',
+            history: (args['history'] as bool?) ?? false,
+          );
+        },
         '/trip': (ctx) {
           final tripId = ModalRoute.of(ctx)!.settings.arguments as String;
           return TripDetailScreen(tripId: tripId);

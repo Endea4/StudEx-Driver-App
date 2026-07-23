@@ -110,11 +110,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   Container(
                     width: 88, height: 88,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.brandCyan, AppTheme.brandCyanDark],
-                        begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
+                      gradient: AppTheme.brandGradient,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                      boxShadow: AppTheme.shadowMd,
                     ),
                     child: Center(
                       child: Text(
@@ -190,11 +188,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted, letterSpacing: 0.3)),
         const SizedBox(height: 8),
         Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.surfaceBorder),
-          ),
+          decoration: AppTheme.cardDecoration(radius: AppTheme.radiusMd),
           child: TextField(
             controller: controller,
             style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w500),
@@ -202,7 +196,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               hintText: hint,
               hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
               prefixIcon: Icon(icon, color: AppTheme.textMuted, size: 20),
+              filled: false,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
           ),
@@ -236,10 +233,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.accent.withOpacity(0.12) : AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? AppTheme.accent.withValues(alpha: 0.12) : AppTheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             border: Border.all(
-              color: isSelected ? AppTheme.accent.withOpacity(0.4) : AppTheme.surfaceBorder,
+              color: isSelected ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.surfaceBorder,
+              width: isSelected ? 1.5 : 1,
             ),
           ),
           child: Row(

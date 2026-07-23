@@ -137,7 +137,7 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.star_outline_rounded, color: AppTheme.textMuted.withOpacity(0.4), size: 64),
+                    Icon(Icons.star_outline_rounded, color: AppTheme.textMuted.withValues(alpha: 0.4), size: 64),
                     const SizedBox(height: 20),
                     const Text('Tidak ada rating menunggu',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
@@ -170,7 +170,7 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.star_outline_rounded, color: AppTheme.danger.withOpacity(0.6), size: 56),
+            Icon(Icons.star_outline_rounded, color: AppTheme.danger.withValues(alpha: 0.6), size: 56),
             const SizedBox(height: 20),
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const SizedBox(height: 8),
@@ -193,11 +193,7 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+      decoration: AppTheme.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -205,7 +201,7 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.accent.withOpacity(0.12),
+                color: AppTheme.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.person, color: AppTheme.accent, size: 20),
@@ -222,8 +218,8 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
           ]),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: AppTheme.bg, borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppTheme.surfaceLight, borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
             child: Column(children: [
               Row(children: [
                 Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),

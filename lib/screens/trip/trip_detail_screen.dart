@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/format.dart';
-import '../../core/network/api_client.dart';
+import '../../core/geo.dart';
 import '../../providers/app_provider.dart';
 
 class TripDetailScreen extends StatefulWidget {
@@ -17,7 +17,6 @@ class TripDetailScreen extends StatefulWidget {
 class _TripDetailScreenState extends State<TripDetailScreen> {
   Map<String, dynamic>? _trip;
   List<dynamic> _logs = [];
-  List<dynamic> _ratings = [];
   bool _isLoading = true;
 
   @override
@@ -47,7 +46,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
-        title: Text('Trip ${widget.tripId.substring(0, widget.tripId.length > 8 ? 8 : widget.tripId.length)}'),
+        title: Text('Detail Trip ${shortCode(widget.tripId)}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -61,110 +60,149 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   color: AppTheme.accent,
                   onRefresh: _loadData,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppTheme.space4),
                     children: [
                       _buildStatusHeader(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.space4),
                       _buildRouteCard(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.space4),
                       _buildPriceCard(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.space4),
                       _buildInfoCard(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.space4),
+                      _buildChatHistoryButton(),
+                      const SizedBox(height: AppTheme.space4),
                       _buildTimeline(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: AppTheme.space8),
                     ],
                   ),
                 ),
     );
   }
 
-  Widget _buildStatusHeader() {
-    final status = _trip?['status'] ?? '';
-    final paymentStatus = _trip?['payment_status'] ?? '';
-    Color statusColor;
+  Color _statusColor(String status) {
     switch (status) {
-      case 'completed': statusColor = AppTheme.success; break;
-      case 'cancelled': statusColor = AppTheme.danger; break;
-      case 'in_progress': statusColor = AppTheme.accent; break;
-      default: statusColor = AppTheme.warning;
+      case 'completed':
+        return AppTheme.success;
+      case 'cancelled':
+        return AppTheme.danger;
+      case 'in_progress':
+        return AppTheme.accent;
+      default:
+        return AppTheme.warning;
     }
+  }
+
+  Widget _buildStatusHeader() {
+    final status = (_trip?['status'] ?? '').toString();
+    final paymentStatus = (_trip?['payment_status'] ?? '').toString();
+    final serviceType = (_trip?['service_type'] ?? '').toString();
+    final statusColor = _statusColor(status);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppTheme.space4),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(color: statusColor.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
           Container(
-            width: 48, height: 48,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: statusColor.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
             child: Icon(
-              status == 'completed' ? Icons.check_circle : status == 'cancelled' ? Icons.cancel : Icons.directions_bike,
-              color: statusColor, size: 24,
+              status == 'completed'
+                  ? Icons.check_circle
+                  : status == 'cancelled'
+                      ? Icons.cancel
+                      : Icons.directions_bike,
+              color: statusColor,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppTheme.space4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(status.toUpperCase(),
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: statusColor)),
-                if (paymentStatus.isNotEmpty)
+                Text(status.isEmpty ? '-' : status.toUpperCase(),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: statusColor, letterSpacing: -0.2)),
+                if (paymentStatus.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text('Pembayaran: $paymentStatus',
                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                ],
               ],
             ),
           ),
-          Text(_trip?['service_type']?.toString().toUpperCase() ?? '',
-              style: const TextStyle(fontSize: 13, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
+          if (serviceType.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                border: Border.all(color: AppTheme.surfaceBorder),
+              ),
+              child: Text(serviceType.toUpperCase(),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cardShell({required String title, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.space4),
+      decoration: AppTheme.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 1.4)),
+          const SizedBox(height: AppTheme.space3),
+          child,
         ],
       ),
     );
   }
 
   Widget _buildRouteCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
-      child: Column(
+    final pl = (_trip?['pickup_lat'] ?? 0).toDouble();
+    final plng = (_trip?['pickup_lng'] ?? 0).toDouble();
+    final dl = (_trip?['dest_lat'] ?? 0).toDouble();
+    final dlng = (_trip?['dest_lng'] ?? 0).toDouble();
+    return _cardShell(
+      title: 'RUTE',
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('RUTE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 1.5)),
-          const SizedBox(height: 12),
-          Row(
+          Column(
             children: [
-              Column(
-                children: [
-                  Container(width: 12, height: 12, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
-                  Container(width: 2, height: 32, color: AppTheme.surfaceBorder),
-                  const Icon(Icons.location_on, color: AppTheme.danger, size: 16),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${_trip?['pickup_lat']?.toStringAsFixed(4) ?? '-'}, ${_trip?['pickup_lng']?.toStringAsFixed(4) ?? '-'}',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
-                    const SizedBox(height: 20),
-                    Text('${_trip?['dest_lat']?.toStringAsFixed(4) ?? '-'}, ${_trip?['dest_lng']?.toStringAsFixed(4) ?? '-'}',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 3),
+              Container(width: 12, height: 12, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
+              Container(width: 2, height: 34, color: AppTheme.surfaceBorder),
+              const Icon(Icons.location_on, color: AppTheme.danger, size: 16),
             ],
+          ),
+          const SizedBox(width: AppTheme.space3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Jemput', style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                AddressText(pl, plng, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, height: 1.35)),
+                const SizedBox(height: AppTheme.space3),
+                const Text('Tujuan', style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                AddressText(dl, dlng, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, height: 1.35)),
+              ],
+            ),
           ),
         ],
       ),
@@ -174,40 +212,31 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget _buildPriceCard() {
     final finalPrice = (_trip?['final_price'] ?? 0).toDouble();
     final bidPrice = (_trip?['current_bid_price'] ?? 0).toDouble();
-    final lastBidder = _trip?['last_bidder'] ?? '';
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
-      child: Column(
+    final lastBidder = (_trip?['last_bidder'] ?? '').toString();
+    return _cardShell(
+      title: 'HARGA',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('HARGA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 1.5)),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Harga Akhir', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                  Text('Rp ${formatMoney(finalPrice)}',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.accent)),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('Harga Bid', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                  Text('Rp ${formatMoney(bidPrice)}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  if (lastBidder.isNotEmpty)
-                    Text('oleh $lastBidder', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                ],
-              ),
+              const Text('Harga Akhir', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+              const SizedBox(height: 2),
+              Text('Rp ${formatMoney(finalPrice)}',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.accent, letterSpacing: -0.5)),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text('Harga Bid', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+              const SizedBox(height: 2),
+              Text('Rp ${formatMoney(bidPrice)}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textSecondary)),
+              if (lastBidder.isNotEmpty)
+                Text('oleh $lastBidder', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
             ],
           ),
         ],
@@ -216,37 +245,61 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   }
 
   Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+    return _cardShell(
+      title: 'INFO',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('INFO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 1.5)),
-          const SizedBox(height: 12),
-          _infoRow('Trip ID', _trip?['id'] ?? ''),
-          _infoRow('Order ID', _trip?['order_id'] ?? ''),
-          _infoRow('Customer', _trip?['customer_ref_id'] ?? ''),
-          _infoRow('Driver', _trip?['driver_ref_id'] ?? ''),
-          _infoRow('Dibuat', _trip?['created_at'] ?? ''),
-          _infoRow('Diperbarui', _trip?['updated_at'] ?? ''),
+          _infoRow('Kode Order', shortCode(_trip?['order_id'])),
+          _infoRow('Dibuat', _fmtTime(_trip?['created_at'])),
+          _infoRow('Diperbarui', _fmtTime(_trip?['updated_at'])),
         ],
+      ),
+    );
+  }
+
+  String _fmtTime(dynamic v) {
+    final s = (v ?? '').toString();
+    if (s.isEmpty) return '-';
+    return s.length > 19 ? s.substring(0, 19).replaceFirst('T', ' ') : s;
+  }
+
+  // Read-only chat history for this trip (bridged conversation with customer).
+  Widget _buildChatHistoryButton() {
+    final tripId = (_trip?['id'] ?? '').toString();
+    if (tripId.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: AppTheme.brandCyan.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        onTap: () => Navigator.pushNamed(context, '/chat',
+            arguments: {'tripId': tripId, 'history': true}),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            const Icon(Icons.forum_rounded, color: AppTheme.brandCyanDark),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Lihat Riwayat Chat',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandCyanDark)),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.brandCyanDark),
+          ]),
+        ),
       ),
     );
   }
 
   Widget _infoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, fontFamily: 'monospace'))),
+          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted))),
+          Expanded(
+              child: Text(value.isEmpty ? '-' : value,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, fontWeight: FontWeight.w600))),
         ],
       ),
     );
@@ -254,62 +307,71 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Widget _buildTimeline() {
     if (_logs.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.surfaceBorder),
+      return _cardShell(
+        title: 'RIWAYAT',
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Center(child: Text('Belum ada riwayat', style: TextStyle(color: AppTheme.textMuted))),
         ),
-        child: const Center(child: Text('Belum ada riwayat', style: TextStyle(color: AppTheme.textMuted))),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('RIWAYAT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 1.5)),
-        const SizedBox(height: 12),
-        ...(_logs.map((log) => _timelineItem(log))),
-      ],
+    return _cardShell(
+      title: 'RIWAYAT',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < _logs.length; i++) _timelineItem(_logs[i], i == _logs.length - 1),
+        ],
+      ),
     );
   }
 
-  Widget _timelineItem(dynamic log) {
-    final fromState = log['from_state'] ?? '';
-    final toState = log['to_state'] ?? '';
-    final actor = log['actor'] ?? '';
-    final reason = log['reason'] ?? '';
-    final ts = log['created_at'] ?? '';
-    final tsShort = ts.length > 19 ? ts.substring(0, 19) : ts;
+  Widget _timelineItem(dynamic log, bool isLast) {
+    final fromState = (log['from_state'] ?? '').toString();
+    final toState = (log['to_state'] ?? '').toString();
+    final actor = (log['actor'] ?? '').toString();
+    final reason = (log['reason'] ?? '').toString();
+    final ts = (log['created_at'] ?? '').toString();
+    final tsShort = ts.length > 19 ? ts.substring(0, 19).replaceFirst('T', ' ') : ts;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Column(
             children: [
+              const SizedBox(height: 3),
               Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle)),
-              Container(width: 2, height: 24, color: AppTheme.surfaceBorder),
+              if (!isLast) Expanded(child: Container(width: 2, color: AppTheme.surfaceBorder)),
             ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppTheme.space3),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$fromState → $toState', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                Row(
-                  children: [
-                    Text(actor, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                    if (reason.isNotEmpty) ...[
-                      const Text(' · ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                      Expanded(child: Text(reason, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted), overflow: TextOverflow.ellipsis)),
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : AppTheme.space4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(fromState.isEmpty ? toState : '$fromState → $toState',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      if (actor.isNotEmpty)
+                        Text(actor, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      if (reason.isNotEmpty) ...[
+                        if (actor.isNotEmpty)
+                          const Text(' · ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                        Expanded(
+                            child: Text(reason,
+                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                overflow: TextOverflow.ellipsis)),
+                      ],
                     ],
-                  ],
-                ),
-                Text(tsShort, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
-              ],
+                  ),
+                  Text(tsShort, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                ],
+              ),
             ),
           ),
         ],

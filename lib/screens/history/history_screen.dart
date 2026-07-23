@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/format.dart';
+import '../../core/geo.dart';
 import '../../providers/history_provider.dart';
 import '../../models/order.dart';
 
@@ -90,7 +91,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppTheme.danger.withOpacity(0.6), size: 56),
+            Icon(icon, color: AppTheme.danger.withValues(alpha: 0.6), size: 56),
             const SizedBox(height: 20),
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const SizedBox(height: 8),
@@ -116,7 +117,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppTheme.textMuted.withOpacity(0.4), size: 64),
+            Icon(icon, color: AppTheme.textMuted.withValues(alpha: 0.4), size: 64),
             const SizedBox(height: 20),
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
             if (subtitle != null) ...[
@@ -138,11 +139,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+      decoration: AppTheme.cardDecoration(),
       child: Column(
         children: [
           Row(
@@ -150,7 +147,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(Icons.motorcycle, color: statusColor, size: 20),
@@ -169,7 +166,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(order.status.toUpperCase(),
@@ -180,21 +177,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppTheme.bg, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: AppTheme.surfaceLight, borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
             child: Column(
               children: [
                 Row(children: [
                   Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(order.pickupDisplay,
-                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(child: AddressText(order.pickupLat, order.pickupLng, maxLines: 1,
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary))),
                 ]),
                 Container(margin: const EdgeInsets.only(left: 3.5), width: 1, height: 16, color: AppTheme.surfaceBorder),
                 Row(children: [
                   const Icon(Icons.location_on, color: AppTheme.danger, size: 14),
                   const SizedBox(width: 6),
-                  Expanded(child: Text(order.destDisplay,
-                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(child: AddressText(order.destLat, order.destLng, maxLines: 1,
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary))),
                 ]),
               ],
             ),

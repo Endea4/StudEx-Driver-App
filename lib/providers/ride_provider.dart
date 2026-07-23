@@ -5,6 +5,7 @@ import '../core/network/websocket_client.dart';
 import '../core/storage/local_storage.dart';
 import '../services/ride_service.dart';
 import '../models/ride.dart';
+import '../core/constants.dart';
 
 enum RideState { idle, offer, active, bidRequest, completed }
 
@@ -60,6 +61,30 @@ class RideProvider extends ChangeNotifier {
           notifyListeners();
           break;
 
+        case 'trip.deal':
+          // The deal event payload omits status/service_type/coords; force
+          // status=deal and preserve prior trip fields so the ride screen
+          // renders the "Start Trip" action for the agreed price.
+          if (_activeTrip != null) {
+            _activeTrip = ActiveTrip.fromJson({
+              ...data,
+              'id': _activeTrip!.id,
+              'order_id': _activeTrip!.orderId,
+              'status': 'deal',
+              'service_type': _activeTrip!.serviceType,
+              'pickup_lat': _activeTrip!.pickupLat,
+              'pickup_lng': _activeTrip!.pickupLng,
+              'dest_lat': _activeTrip!.destLat,
+              'dest_lng': _activeTrip!.destLng,
+            });
+          } else {
+            _activeTrip = ActiveTrip.fromJson({...data, 'status': 'deal'});
+          }
+          _state = RideState.active;
+          _error = null;
+          notifyListeners();
+          break;
+
         case 'trip.started':
           if (_activeTrip != null) {
             _activeTrip = ActiveTrip.fromJson({...data, 'id': _activeTrip!.id, 'orderId': _activeTrip!.orderId});
@@ -77,10 +102,23 @@ class RideProvider extends ChangeNotifier {
           break;
 
         case 'trip.bargaining':
-          if (_activeTrip != null) {
-            _activeTrip = ActiveTrip.fromJson({...data, 'id': _activeTrip!.id, 'orderId': _activeTrip!.orderId});
-          }
+          // The bargaining event omits status/service_type/coords; keep the
+          // prior trip fields and force status=bargaining so the driver sees
+          // the bid-response UI (accept the counter or re-bid).
+          _activeTrip = ActiveTrip.fromJson({
+            if (_activeTrip != null) ...{
+              'id': _activeTrip!.id,
+              'service_type': _activeTrip!.serviceType,
+              'pickup_lat': _activeTrip!.pickupLat,
+              'pickup_lng': _activeTrip!.pickupLng,
+              'dest_lat': _activeTrip!.destLat,
+              'dest_lng': _activeTrip!.destLng,
+            },
+            ...data,
+            'status': 'bargaining',
+          });
           _state = RideState.bidRequest;
+          _error = null;
           notifyListeners();
           break;
 
@@ -101,6 +139,8 @@ class RideProvider extends ChangeNotifier {
         _activeTrip = await rideService.acceptTrip(pending['id'] as String);
         _state = RideState.active;
         _currentOffer = null;
+        // Open the chat room now that the driver has accepted.
+        _openChatRoom(_activeTrip!.id, driverId ?? '', _activeTrip!.customerRefId);
         return true;
       }
       _setError('Trip tidak ditemukan');
@@ -111,6 +151,14 @@ class RideProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  // Best-effort: tell the message-service to open the trip's chat room.
+  void _openChatRoom(String tripId, String driverRefId, String customerRefId) {
+    _api.post(ApiConstants.chatOpen(tripId), body: {
+      'driver_ref_id': driverRefId,
+      'customer_ref_id': customerRefId,
+    }).then((_) {}, onError: (_) {});
   }
 
   Future<bool> rejectOffer({String reason = ''}) async {
@@ -150,13 +198,14 @@ class RideProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> completeTrip({bool isDebt = false}) async {
+  Future<bool> completeTrip({bool isDebt = false, double debtAmount = 0}) async {
     if (_activeTrip == null) return false;
     _setLoading(true);
     try {
       _activeTrip = await rideService.completeTrip(
         _activeTrip!.id,
         paymentStatus: isDebt ? 'debt' : 'paid',
+        debtAmount: debtAmount,
       );
       notifyListeners();
       return true;
@@ -173,7 +222,9 @@ class RideProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       _activeTrip = await rideService.submitBid(_activeTrip!.id, amount, reason: reason);
-      _state = RideState.active;
+      // Stay in the bid view so the driver can see the negotiation and accept
+      // the customer's counter (instead of dropping to the plain active view).
+      _state = RideState.bidRequest;
       return true;
     } catch (e) {
       _setError(e.toString());

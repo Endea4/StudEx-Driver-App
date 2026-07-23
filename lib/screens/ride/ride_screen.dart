@@ -7,8 +7,10 @@ import 'dart:async';
 import 'dart:convert';
 import '../../core/theme.dart';
 import '../../core/format.dart';
+import '../../core/geo.dart';
 import '../../providers/ride_provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../models/ride.dart';
 
 class RideScreen extends StatefulWidget {
@@ -184,7 +186,7 @@ class _RideScreenState extends State<RideScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               margin: const EdgeInsets.only(top: 16),
-              decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.surfaceBorder)),
+              decoration: AppTheme.cardDecoration(),
               child: Column(children: [
                 const Icon(Icons.inbox_rounded, color: AppTheme.textMuted, size: 48),
                 const SizedBox(height: 12),
@@ -230,7 +232,7 @@ class _RideScreenState extends State<RideScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.3))),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.3))),
         child: Column(
           children: [
             Text('$count', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
@@ -247,28 +249,36 @@ class _RideScreenState extends State<RideScreen> {
     final label = _statusLabel(status);
     final icon = _statusIcon(status);
     final price = (trip['final_price'] ?? 0).toInt();
-    final pl = trip['pickup_lat'] ?? 0;
-    final dl = trip['dest_lat'] ?? 0;
+    final pl = (trip['pickup_lat'] ?? 0).toDouble();
+    final plng = (trip['pickup_lng'] ?? 0).toDouble();
+    final dl = (trip['dest_lat'] ?? 0).toDouble();
+    final dlng = (trip['dest_lng'] ?? 0).toDouble();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.surfaceBorder)),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.cardDecoration(radius: AppTheme.radiusMd),
       child: ListTile(
         onTap: () => _onTripTap(trip),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           width: 40, height: 40,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
           child: Icon(icon, color: color, size: 20),
         ),
         title: Row(
           children: [
             Text('Rp ${formatMoney(price)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const SizedBox(width: 8),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)), child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color))),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)), child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color))),
           ],
         ),
-        subtitle: Text('${pl.toStringAsFixed(3)}→${dl.toStringAsFixed(3)}', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+        subtitle: Row(children: [
+          const Icon(Icons.place, size: 12, color: AppTheme.textMuted),
+          const SizedBox(width: 3),
+          Expanded(child: AddressText(pl, plng, maxLines: 1, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted))),
+          const Icon(Icons.arrow_right_alt, size: 14, color: AppTheme.textMuted),
+          Expanded(child: AddressText(dl, dlng, maxLines: 1, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted))),
+        ]),
         trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
       ),
     );
@@ -321,6 +331,8 @@ class _RideScreenState extends State<RideScreen> {
         _buildMap(offer.pickupLat, offer.pickupLng, offer.destLat, offer.destLng),
         const SizedBox(height: 16),
         _buildInfoCard([
+          _addrRow('Jemput', offer.pickupLat, offer.pickupLng),
+          _addrRow('Tujuan', offer.destLat, offer.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
           _infoRow('Estimasi Harga', 'Rp ${formatMoney(offer.estimatedPrice.toInt())}'),
           _infoRow('Layanan', offer.serviceType.toUpperCase()),
@@ -380,9 +392,15 @@ class _RideScreenState extends State<RideScreen> {
         const SizedBox(height: 12),
         _buildInfoCard([
           _infoRow('Status', trip.status.toUpperCase()),
+          _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
+          _addrRow('Tujuan', trip.destLat, trip.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
           if (trip.finalPrice > 0) _infoRow('Harga', 'Rp ${formatMoney(trip.finalPrice.toInt())}'),
         ]),
+        if (trip.status == 'accepted' || trip.status == 'deal' || trip.status == 'in_progress') ...[
+          const SizedBox(height: 12),
+          _buildChatButton(trip.id, trip.customerRefId),
+        ],
         const SizedBox(height: 24),
         if (trip.status == 'created' || trip.status == 'pending' || trip.status == 'accepted' || trip.status == 'deal') ...[
           _buildActionButton('Mulai Perjalanan', Icons.play_arrow, AppTheme.accent, () => _provider.startTrip()),
@@ -398,9 +416,76 @@ class _RideScreenState extends State<RideScreen> {
         if (trip.status == 'in_progress') ...[
           _buildActionButton('Selesai — Tunai', Icons.money, AppTheme.success, () => _provider.completeTrip(isDebt: false)),
           const SizedBox(height: 12),
-          _buildActionButton('Selesai — Utang', Icons.money_off, AppTheme.warning, () => _provider.completeTrip(isDebt: true)),
+          _buildActionButton('Selesai — Utang', Icons.money_off, AppTheme.warning, () => _completeWithDebt(trip.finalPrice)),
         ],
       ],
+    );
+  }
+
+  Widget _buildChatButton(String tripId, String customerRefId) {
+    final chat = context.watch<ChatProvider>();
+    final unread = chat.tripId == tripId ? chat.unread : 0;
+    return Material(
+      color: AppTheme.brandCyan.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        onTap: () => Navigator.pushNamed(context, '/chat', arguments: {
+          'tripId': tripId,
+          'customerRefId': customerRefId,
+        }),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.brandCyan.withValues(alpha: 0.25)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.brandCyan.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: const Icon(Icons.chat_bubble_rounded,
+                    color: AppTheme.brandCyanDark, size: 20),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Chat dengan Customer',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.brandCyanDark)),
+                    SizedBox(height: 2),
+                    Text('Terhubung via WhatsApp',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  ],
+                ),
+              ),
+              if (unread > 0)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                      color: AppTheme.danger,
+                      borderRadius: BorderRadius.circular(11)),
+                  child: Text('$unread',
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              const Icon(Icons.chevron_right, color: AppTheme.brandCyanDark),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -408,9 +493,9 @@ class _RideScreenState extends State<RideScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.warning.withOpacity(0.1),
+        color: AppTheme.warning.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -470,6 +555,11 @@ class _RideScreenState extends State<RideScreen> {
       children: [
         _buildMap(trip.pickupLat, trip.pickupLng, trip.destLat, trip.destLng),
         const SizedBox(height: 16),
+        _buildInfoCard([
+          _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
+          _addrRow('Tujuan', trip.destLat, trip.destLng),
+        ]),
+        const SizedBox(height: 12),
         _buildBidCard(),
       ],
     );
@@ -479,9 +569,9 @@ class _RideScreenState extends State<RideScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.warning.withOpacity(0.1),
+        color: AppTheme.warning.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
       ),
       child: Column(children: [
         const Icon(Icons.gavel, color: AppTheme.warning, size: 32),
@@ -584,7 +674,7 @@ class _RideScreenState extends State<RideScreen> {
     }
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.3))),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.3))),
       child: Row(children: [Icon(icon, color: color, size: 22), const SizedBox(width: 12), Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color))]),
     );
   }
@@ -647,10 +737,10 @@ class _RideScreenState extends State<RideScreen> {
   void _showTripDetailDialog(Map<String, dynamic> trip, String label, Color color) {
     final price = (trip['final_price'] ?? 0).toInt();
     final bid = (trip['current_bid_price'] ?? 0).toInt();
-    final pl = trip['pickup_lat'] ?? 0;
-    final plng = trip['pickup_lng'] ?? 0;
-    final dl = trip['dest_lat'] ?? 0;
-    final dlng = trip['dest_lng'] ?? 0;
+    final pl = (trip['pickup_lat'] ?? 0).toDouble();
+    final plng = (trip['pickup_lng'] ?? 0).toDouble();
+    final dl = (trip['dest_lat'] ?? 0).toDouble();
+    final dlng = (trip['dest_lng'] ?? 0).toDouble();
     final ts = trip['updated_at'] ?? trip['created_at'] ?? '';
     final tsShort = ts.toString().length > 19 ? ts.toString().substring(0, 19) : ts.toString();
 
@@ -671,13 +761,12 @@ class _RideScreenState extends State<RideScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _detailRow('Order', trip['order_id'] ?? ''),
-            if (trip['id'] != null) _detailRow('Trip ID', trip['id'] ?? ''),
+            _detailRow('Kode Order', shortCode(trip['order_id'])),
             _detailRow('Status', label),
             _detailRow('Harga', 'Rp ${formatMoney(price)}'),
             if (bid > 0) _detailRow('Bid', 'Rp ${formatMoney(bid)}'),
-            _detailRow('Pickup', '${pl.toStringAsFixed(4)}, ${plng.toStringAsFixed(4)}'),
-            _detailRow('Dropoff', '${dl.toStringAsFixed(4)}, ${dlng.toStringAsFixed(4)}'),
+            _detailAddrRow('Jemput', pl, plng),
+            _detailAddrRow('Tujuan', dl, dlng),
             if (tsShort.isNotEmpty) _detailRow('Waktu', tsShort),
           ],
         ),
@@ -720,8 +809,8 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildInfoCard(List<Widget> rows) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.surfaceBorder)),
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+    decoration: AppTheme.cardDecoration(),
     child: Column(children: rows),
   );
 
@@ -733,11 +822,63 @@ class _RideScreenState extends State<RideScreen> {
     ]),
   );
 
+  // Row showing a reverse-geocoded place name for a coordinate.
+  Widget _addrRow(String label, double lat, double lng) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 70, child: Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted))),
+      Expanded(
+        child: AddressText(lat, lng,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+      ),
+    ]),
+  );
+
+  // Complete as debt: prompt for the owed amount (default = trip price).
+  Future<void> _completeWithDebt(double defaultAmount) async {
+    final ctrl = TextEditingController(
+        text: defaultAmount > 0 ? defaultAmount.toInt().toString() : '');
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Selesai — Utang'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Berapa jumlah utang penumpang?', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Jumlah utang (Rp)', prefixText: 'Rp '),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text) ?? 0),
+            child: const Text('Konfirmasi'),
+          ),
+        ],
+      ),
+    );
+    if (amount != null && amount > 0) {
+      await _provider.completeTrip(isDebt: true, debtAmount: amount);
+    }
+  }
+
   Widget _detailRow(String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
       Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, fontFamily: 'monospace'))),
+    ]),
+  );
+
+  Widget _detailAddrRow(String label, double lat, double lng) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
+      Expanded(child: AddressText(lat, lng, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary))),
     ]),
   );
 

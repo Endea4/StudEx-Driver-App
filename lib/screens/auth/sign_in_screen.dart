@@ -103,7 +103,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: AppTheme.accent.withOpacity(0.1),
+                    color: AppTheme.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: const Icon(Icons.motorcycle_rounded, color: AppTheme.accent, size: 36),
@@ -181,7 +181,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.accent,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: AppTheme.accent.withOpacity(0.4),
+                        disabledBackgroundColor: AppTheme.accent.withValues(alpha: 0.4),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -237,8 +237,8 @@ class _SignInScreenState extends State<SignInScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.bg,
-        borderRadius: BorderRadius.circular(14),
+        color: AppTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         border: Border.all(color: AppTheme.surfaceBorder),
       ),
       child: TextField(

@@ -53,6 +53,7 @@ class ActiveTrip {
   final String? lastBidder;
   final String? reason;
   final String paymentStatus;
+  final String customerRefId;
 
   ActiveTrip({
     required this.id,
@@ -68,6 +69,7 @@ class ActiveTrip {
     this.lastBidder,
     this.reason,
     this.paymentStatus = '',
+    this.customerRefId = '',
   });
 
   factory ActiveTrip.fromJson(Map<String, dynamic> json) {
@@ -75,6 +77,7 @@ class ActiveTrip {
       id: json['id'] ?? '',
       orderId: json['order_id'] ?? '',
       status: json['status'] ?? '',
+      customerRefId: (json['customer_ref_id'] ?? '').toString(),
       serviceType: json['service_type'] ?? '',
       pickupLat: (json['pickup_lat'] ?? 0).toDouble(),
       pickupLng: (json['pickup_lng'] ?? 0).toDouble(),

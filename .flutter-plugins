@@ -2,6 +2,9 @@
 flutter_local_notifications=/home/izcy-tuf/.pub-cache/hosted/pub.dev/flutter_local_notifications-18.0.1/
 flutter_local_notifications_linux=/home/izcy-tuf/.pub-cache/hosted/pub.dev/flutter_local_notifications_linux-5.0.0/
 flutter_plugin_android_lifecycle=/home/izcy-tuf/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.22/
+geocoding=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geocoding-3.0.0/
+geocoding_android=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geocoding_android-3.3.1/
+geocoding_ios=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geocoding_ios-3.1.0/
 geolocator=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geolocator-13.0.2/
 geolocator_android=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geolocator_android-4.6.1/
 geolocator_apple=/home/izcy-tuf/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.9/

@@ -61,7 +61,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.assessment_outlined,
-                      color: AppTheme.textMuted.withOpacity(0.5), size: 64),
+                      color: AppTheme.textMuted.withValues(alpha: 0.5), size: 64),
                   const SizedBox(height: 16),
                   const Text('Belum ada data reputasi',
                       style: TextStyle(color: AppTheme.textMuted, fontSize: 15)),
@@ -85,14 +85,14 @@ class _ReputationScreenState extends State<ReputationScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.accent.withOpacity(0.15),
-                        AppTheme.accent.withOpacity(0.05),
+                        AppTheme.accent.withValues(alpha: 0.15),
+                        AppTheme.accent.withValues(alpha: 0.05),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
+                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     children: [
@@ -160,13 +160,9 @@ class _ReputationScreenState extends State<ReputationScreen> {
     final ts =
         '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}';
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardDecoration(radius: AppTheme.radiusMd),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -176,7 +172,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppTheme.accent.withOpacity(0.12),
+                  color: AppTheme.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.person, color: AppTheme.accent, size: 16),
@@ -238,12 +234,12 @@ class _StarIcon extends StatelessWidget {
       height: size,
       child: Stack(
         children: [
-          Icon(Icons.star_rounded, color: AppTheme.warning.withOpacity(0.25), size: size),
+          Icon(Icons.star_rounded, color: AppTheme.warning.withValues(alpha: 0.25), size: size),
           ShaderMask(
             shaderCallback: (rect) {
               return LinearGradient(
                 stops: [fill, fill],
-                colors: [AppTheme.warning, AppTheme.warning.withOpacity(0)],
+                colors: [AppTheme.warning, AppTheme.warning.withValues(alpha: 0)],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 tileMode: TileMode.mirror,
