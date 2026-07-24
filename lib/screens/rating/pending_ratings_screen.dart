@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/status.dart';
+import '../../core/states.dart';
+import '../../core/geo.dart';
 import '../../providers/rating_provider.dart';
 
 class PendingRatingsScreen extends StatefulWidget {
@@ -41,12 +44,23 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: AppTheme.bg, borderRadius: BorderRadius.circular(12)),
                   child: Column(children: [
-                    Text(rating.customerName,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text('${rating.serviceType} · ${rating.origin} → ${rating.destination}',
+                    Text(
+                      (rating.customerName as String).isNotEmpty ? rating.customerName : 'Customer',
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                    ),
+                    if (rating.hasRoute == true) ...[
+                      const SizedBox(height: 4),
+                      DefaultTextStyle(
                         style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                        textAlign: TextAlign.center),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Flexible(child: AddressText(rating.pickupLat, rating.pickupLng, maxLines: 1,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
+                          const Text('  →  '),
+                          Flexible(child: AddressText(rating.destLat, rating.destLng, maxLines: 1,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
+                        ]),
+                      ),
+                    ],
                   ]),
                 ),
                 const SizedBox(height: 20),
@@ -123,30 +137,19 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
             return const Center(child: CircularProgressIndicator(color: AppTheme.accent));
           }
           if (provider.error != null) {
-            return _buildError(
+            return ErrorState(
               title: 'Gagal memuat rating',
-              subtitle: provider.error!,
+              detail: provider.error,
+              icon: Icons.star_border_rounded,
               onRetry: () => provider.fetchPendingRatings(),
             );
           }
           final pending = provider.pendingRatings.where((r) => !r.driverResponded).toList();
           if (pending.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.star_outline_rounded, color: AppTheme.textMuted.withValues(alpha: 0.4), size: 64),
-                    const SizedBox(height: 20),
-                    const Text('Tidak ada rating menunggu',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 8),
-                    const Text('Semua rating sudah diberikan',
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-                  ],
-                ),
-              ),
+            return const EmptyState(
+              title: 'Tidak ada rating menunggu',
+              detail: 'Semua rating sudah kamu berikan.',
+              icon: Icons.star_outline_rounded,
             );
           }
           return RefreshIndicator(
@@ -159,32 +162,6 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildError({required String title, required String subtitle, VoidCallback? onRetry}) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.star_outline_rounded, color: AppTheme.danger.withValues(alpha: 0.6), size: 56),
-            const SizedBox(height: 20),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-            const SizedBox(height: 8),
-            Text(subtitle, style: const TextStyle(color: AppTheme.textMuted, fontSize: 13), textAlign: TextAlign.center),
-            if (onRetry != null) ...[
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Coba Lagi'),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -209,31 +186,42 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(rating.customerName,
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                Text(rating.serviceType.toUpperCase(),
-                    style: const TextStyle(fontSize: 11, color: AppTheme.warning, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                Text(
+                  (rating.customerName as String).isNotEmpty ? rating.customerName : 'Customer',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: (rating.serviceType as String).isNotEmpty
+                      ? StatusBadge.service(rating.serviceType, small: true)
+                      : const StatusBadge(label: 'Selesai', color: AppTheme.success, small: true),
+                ),
               ]),
             ),
           ]),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppTheme.surfaceLight, borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
-            child: Column(children: [
-              Row(children: [
-                Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(rating.origin, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
+          if (rating.hasRoute == true) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppTheme.surfaceLight, borderRadius: BorderRadius.circular(AppTheme.radiusSm)),
+              child: Column(children: [
+                Row(children: [
+                  Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  Expanded(child: AddressText(rating.pickupLat, rating.pickupLng, maxLines: 1,
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
+                ]),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.location_on, color: AppTheme.danger, size: 12),
+                  const SizedBox(width: 4),
+                  Expanded(child: AddressText(rating.destLat, rating.destLng, maxLines: 1,
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
+                ]),
               ]),
-              const SizedBox(height: 4),
-              Row(children: [
-                const Icon(Icons.location_on, color: AppTheme.danger, size: 12),
-                const SizedBox(width: 4),
-                Expanded(child: Text(rating.destination, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-              ]),
-            ]),
-          ),
+            ),
+          ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,

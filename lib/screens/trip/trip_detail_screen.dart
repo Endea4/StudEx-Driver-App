@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/status.dart';
 import '../../core/format.dart';
 import '../../core/geo.dart';
 import '../../providers/app_provider.dart';
@@ -129,27 +130,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(status.isEmpty ? '-' : status.toUpperCase(),
+                Text(TripStatus.label(status),
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: statusColor, letterSpacing: -0.2)),
                 if (paymentStatus.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text('Pembayaran: $paymentStatus',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Text('Pembayaran',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                    const SizedBox(width: 6),
+                    StatusBadge.payment(paymentStatus, small: true),
+                  ]),
                 ],
               ],
             ),
           ),
-          if (serviceType.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                border: Border.all(color: AppTheme.surfaceBorder),
-              ),
-              child: Text(serviceType.toUpperCase(),
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            ),
+          if (serviceType.isNotEmpty) StatusBadge.service(serviceType),
         ],
       ),
     );
@@ -260,7 +255,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   String _fmtTime(dynamic v) {
     final s = (v ?? '').toString();
     if (s.isEmpty) return '-';
-    return s.length > 19 ? s.substring(0, 19).replaceFirst('T', ' ') : s;
+    return formatDateTime(s);
   }
 
   // Read-only chat history for this trip (bridged conversation with customer).
@@ -332,7 +327,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final actor = (log['actor'] ?? '').toString();
     final reason = (log['reason'] ?? '').toString();
     final ts = (log['created_at'] ?? '').toString();
-    final tsShort = ts.length > 19 ? ts.substring(0, 19).replaceFirst('T', ' ') : ts;
+    final tsShort = formatDateTime(ts);
 
     return IntrinsicHeight(
       child: Row(

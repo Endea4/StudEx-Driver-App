@@ -8,6 +8,8 @@ import 'dart:convert';
 import '../../core/theme.dart';
 import '../../core/format.dart';
 import '../../core/geo.dart';
+import '../../core/status.dart';
+import '../../core/states.dart';
 import '../../providers/ride_provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -78,6 +80,18 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   void _onProviderChanged() {
+    // A rejected action (e.g. bidding twice in a row) leaves the trip intact,
+    // so report it in a snackbar and keep the screen as it is.
+    final actionError = _provider.actionError;
+    if (actionError != null && mounted) {
+      _provider.clearActionError();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(actionError),
+          backgroundColor: AppTheme.danger,
+        ));
+    }
     setState(() {
       _state = _provider.state;
       _offer = _provider.currentOffer;
@@ -142,15 +156,13 @@ class _RideScreenState extends State<RideScreen> {
       return const Center(child: CircularProgressIndicator(color: AppTheme.accent));
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: AppTheme.textMuted)),
-          ],
-        ),
+      return ErrorState(
+        title: 'Terjadi kesalahan',
+        detail: _error,
+        onRetry: () {
+          setState(() => _error = null);
+          _fetchTrips();
+        },
       );
     }
     switch (_state) {
@@ -335,7 +347,7 @@ class _RideScreenState extends State<RideScreen> {
           _addrRow('Tujuan', offer.destLat, offer.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
           _infoRow('Estimasi Harga', 'Rp ${formatMoney(offer.estimatedPrice.toInt())}'),
-          _infoRow('Layanan', offer.serviceType.toUpperCase()),
+          _badgeRow('Layanan', StatusBadge.service(offer.serviceType)),
         ]),
         const SizedBox(height: 24),
         Row(
@@ -391,7 +403,7 @@ class _RideScreenState extends State<RideScreen> {
         _buildStatusBanner(trip.status),
         const SizedBox(height: 12),
         _buildInfoCard([
-          _infoRow('Status', trip.status.toUpperCase()),
+          _badgeRow('Status', StatusBadge.trip(trip.status)),
           _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
           _addrRow('Tujuan', trip.destLat, trip.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
@@ -670,7 +682,12 @@ class _RideScreenState extends State<RideScreen> {
     switch (status) {
       case 'in_progress': color = AppTheme.accent; label = 'Perjalanan Sedang Berlangsung'; icon = Icons.directions_bike; break;
       case 'deal': color = AppTheme.success; label = 'Harga Disetujui'; icon = Icons.handshake; break;
-      default: color = AppTheme.textMuted; label = status; icon = Icons.info;
+      case 'accepted': color = AppTheme.success; label = 'Pesanan Diterima — Menuju Penjemputan'; icon = Icons.check_circle; break;
+      case 'bargaining': color = AppTheme.warning; label = 'Sedang Tawar-menawar'; icon = Icons.gavel; break;
+      default:
+        // Never show a raw backend status code to the driver; the detail card
+        // right below already spells the state out.
+        return const SizedBox.shrink();
     }
     return Container(
       padding: const EdgeInsets.all(14),
@@ -742,7 +759,8 @@ class _RideScreenState extends State<RideScreen> {
     final dl = (trip['dest_lat'] ?? 0).toDouble();
     final dlng = (trip['dest_lng'] ?? 0).toDouble();
     final ts = trip['updated_at'] ?? trip['created_at'] ?? '';
-    final tsShort = ts.toString().length > 19 ? ts.toString().substring(0, 19) : ts.toString();
+    final tsShort = formatDateTime(ts);
+    final paymentStatus = (trip['payment_status'] ?? '').toString();
 
     showDialog(
       context: context,
@@ -762,7 +780,9 @@ class _RideScreenState extends State<RideScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _detailRow('Kode Order', shortCode(trip['order_id'])),
-            _detailRow('Status', label),
+            _detailBadgeRow('Status', StatusBadge.trip((trip['status'] ?? '').toString(), small: true)),
+            if (paymentStatus.isNotEmpty)
+              _detailBadgeRow('Pembayaran', StatusBadge.payment(paymentStatus, small: true)),
             _detailRow('Harga', 'Rp ${formatMoney(price)}'),
             if (bid > 0) _detailRow('Bid', 'Rp ${formatMoney(bid)}'),
             _detailAddrRow('Jemput', pl, plng),
@@ -812,6 +832,16 @@ class _RideScreenState extends State<RideScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
     decoration: AppTheme.cardDecoration(),
     child: Column(children: rows),
+  );
+
+  // Row whose value is an enum, shown as a coloured badge rather than a raw
+  // backend token like IN_PROGRESS.
+  Widget _badgeRow(String label, Widget badge) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+      badge,
+    ]),
   );
 
   Widget _infoRow(String label, String value) => Padding(
@@ -865,6 +895,14 @@ class _RideScreenState extends State<RideScreen> {
       await _provider.completeTrip(isDebt: true, debtAmount: amount);
     }
   }
+  // Detail row whose value is an enum badge instead of raw text.
+  Widget _detailBadgeRow(String label, Widget badge) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(children: [
+      SizedBox(width: 110, child: Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted))),
+      badge,
+    ]),
+  );
 
   Widget _detailRow(String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),

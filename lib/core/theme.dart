@@ -222,8 +222,10 @@ class AppTheme {
           ),
         ),
         switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith((states) =>
-              states.contains(WidgetState.selected) ? accent : Colors.white),
+          // Thumb stays white in both states so the knob is always visible
+          // against the track (a blue thumb on a blue track looked like a
+          // solid blob when switched on).
+          thumbColor: WidgetStateProperty.all(Colors.white),
           trackColor: WidgetStateProperty.resolveWith((states) =>
               states.contains(WidgetState.selected)
                   ? accent

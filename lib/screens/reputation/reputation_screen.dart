@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/states.dart';
 import '../../models/reputation.dart';
 import '../../providers/reputation_provider.dart';
 
@@ -37,21 +38,11 @@ class _ReputationScreenState extends State<ReputationScreen> {
             return const Center(child: CircularProgressIndicator(color: AppTheme.accent));
           }
           if (provider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
-                  const SizedBox(height: 16),
-                  Text('Error: ${provider.error}',
-                      style: const TextStyle(color: AppTheme.textSecondary)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.fetchReputation(),
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
-              ),
+            return ErrorState(
+              title: 'Gagal memuat reputasi',
+              detail: provider.error,
+              icon: Icons.star_border_rounded,
+              onRetry: () => provider.fetchReputation(),
             );
           }
           final rep = provider.reputation;
@@ -97,7 +88,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
                   child: Column(
                     children: [
                       Text(
-                        rep.score.toStringAsFixed(1),
+                        _effectiveScore(rep).toStringAsFixed(1),
                         style: const TextStyle(
                           fontSize: 56,
                           fontWeight: FontWeight.w900,
@@ -110,7 +101,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (index) {
-                          final fillValue = (rep.score - index).clamp(0.0, 1.0).toDouble();
+                          final fillValue = (_effectiveScore(rep) - index).clamp(0.0, 1.0).toDouble();
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             child: _StarIcon(fill: fillValue, size: 28),
@@ -119,7 +110,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${rep.totalReviews} review',
+                        '${_effectiveCount(rep)} review',
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 14,
@@ -156,6 +147,36 @@ class _ReputationScreenState extends State<ReputationScreen> {
     );
   }
 
+  /// The reviewer's display name.
+  ///
+  /// Customers who typed a location link while being asked for their name ended
+  /// up stored with a URL as their name, which then showed as the review
+  /// author. Anything that is not plausibly a name falls back to "Penumpang".
+  static String _displayName(String raw) {
+    final n = raw.trim();
+    if (n.isEmpty) return 'Penumpang';
+    final looksLikeUrlOrCoords = n.contains('://') ||
+        n.contains('www.') ||
+        RegExp(r'^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$').hasMatch(n);
+    if (looksLikeUrlOrCoords) return 'Penumpang';
+    return n;
+  }
+
+  /// Falls back to the loaded reviews when the aggregate has not been computed
+  /// yet, so the header cannot read "0.0 / 0 review" above a list of reviews.
+  static double _effectiveScore(dynamic rep) {
+    if (rep.score > 0) return rep.score as double;
+    final reviews = rep.reviews as List;
+    if (reviews.isEmpty) return 0;
+    final total = reviews.fold<double>(0, (sum, r) => sum + (r.score as num).toDouble());
+    return total / reviews.length;
+  }
+
+  static int _effectiveCount(dynamic rep) {
+    if (rep.totalReviews > 0) return rep.totalReviews as int;
+    return (rep.reviews as List).length;
+  }
+
   Widget _reviewCard(Review review) {
     final ts =
         '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}';
@@ -180,7 +201,7 @@ class _ReputationScreenState extends State<ReputationScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  review.raterName,
+                  _displayName(review.raterName),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textPrimary,

@@ -11,7 +11,7 @@ class DebtProvider extends ChangeNotifier {
   String? _error;
 
   List<Debt> get debts => _debts;
-  List<Debt> get activeDebts => _debts.where((d) => d.isActive).toList();
+  List<Debt> get activeDebts => _debts.where((d) => d.isOutstanding).toList();
   bool get isLoading => _isLoading;
   String? get error => _error;
 

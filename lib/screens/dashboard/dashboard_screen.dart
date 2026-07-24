@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/status.dart';
+import '../../core/states.dart';
 import '../../core/format.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/driver_provider.dart';
@@ -67,9 +69,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _showNotification('Trip Selesai', 'Perjalanan selesai', Icons.check_circle, AppTheme.success);
       } else if (type == 'trip.cancelled') {
         _showNotification('Trip Dibatalkan', 'Perjalanan dibatalkan', Icons.cancel, AppTheme.danger);
-      } else if (type == 'match.timeout') {
-        _showNotification('Match Timeout', 'Tidak ada driver tersedia', Icons.timer_off, AppTheme.textMuted);
       }
+      // match.timeout ("tidak ada driver tersedia") is addressed to the
+      // customer who is still waiting for a match. It says nothing to a
+      // driver, so it is deliberately not surfaced here.
     });
   }
 
@@ -201,20 +204,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
 
           if (driver == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
-                  const SizedBox(height: 16),
-                  const Text('Gagal memuat profil', style: TextStyle(color: AppTheme.textSecondary)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => driverProvider.fetchProfile(),
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
-              ),
+            return ErrorState(
+              title: 'Gagal memuat profil',
+              detail: driverProvider.error,
+              icon: Icons.person_off_rounded,
+              onRetry: () => driverProvider.fetchProfile(),
             );
           }
 
@@ -312,7 +306,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icon(driver.gender.toLowerCase() == 'male' ? Icons.male : Icons.female,
                             size: 14, color: AppTheme.textMuted),
                         const SizedBox(width: 4),
-                        Text(driver.gender, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                        Text(Gender.label(driver.gender), style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                       ],
                     ),
                   const SizedBox(height: 6),

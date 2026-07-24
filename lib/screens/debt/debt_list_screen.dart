@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/status.dart';
 import '../../core/format.dart';
 import '../../providers/debt_provider.dart';
 
@@ -180,6 +181,8 @@ class _DebtListScreenState extends State<DebtListScreen> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(ts, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                const SizedBox(height: 4),
+                                StatusBadge.payment(debt.status, small: true),
                                 const SizedBox(height: 4),
                                 const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
                               ],

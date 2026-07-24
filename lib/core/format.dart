@@ -20,3 +20,22 @@ String formatMoney(dynamic amount) {
   }
   return buf.toString();
 }
+
+const _monthsId = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+/// Formats a backend timestamp as e.g. "24 Jul 2026, 08:05".
+///
+/// Raw ISO strings ("2026-07-24T01:05:00Z") were being shown to drivers; this
+/// renders local time in a readable form. Returns '' for unparseable input.
+String formatDateTime(dynamic raw) {
+  final s = raw?.toString() ?? '';
+  if (s.isEmpty) return '';
+  final dt = DateTime.tryParse(s)?.toLocal();
+  if (dt == null) return s;
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
+  return '${dt.day} ${_monthsId[dt.month - 1]} ${dt.year}, $hh:$mm';
+}

@@ -15,6 +15,7 @@ class ChatProvider extends ChangeNotifier {
   String? _tripId;
   bool _active = false;
   bool _loading = false;
+  bool _sessionExpired = false;
   int _unread = 0;
   final List<ChatMessage> _messages = [];
 
@@ -25,6 +26,11 @@ class ChatProvider extends ChangeNotifier {
   String? get tripId => _tripId;
   bool get active => _active;
   bool get loading => _loading;
+
+  /// True when the room could not be read because the session token expired.
+  /// Distinct from [active] == false, which means the trip's room really is
+  /// closed.
+  bool get sessionExpired => _sessionExpired;
   int get unread => _unread;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
 
@@ -49,14 +55,21 @@ class ChatProvider extends ChangeNotifier {
     _tripId = tripId;
     _loading = true;
     _unread = 0;
+    _sessionExpired = false;
     notifyListeners();
-    await _service.openRoom(tripId,
-        driverRefId: driverRefId, customerRefId: customerRefId, orderId: orderId);
-    final (active, history) = await _service.fetchRoom(tripId);
-    _active = active;
-    _messages
-      ..clear()
-      ..addAll(history);
+    try {
+      await _service.openRoom(tripId,
+          driverRefId: driverRefId, customerRefId: customerRefId, orderId: orderId);
+      final (active, history) = await _service.fetchRoom(tripId);
+      _active = active;
+      _messages
+        ..clear()
+        ..addAll(history);
+    } on SessionExpiredException {
+      _sessionExpired = true;
+      _active = false;
+      _messages.clear();
+    }
     _loading = false;
     notifyListeners();
   }

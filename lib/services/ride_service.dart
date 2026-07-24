@@ -2,6 +2,40 @@ import 'dart:convert';
 import '../core/network/api_client.dart';
 import '../models/ride.dart';
 
+/// A failed API call, carrying a message that is safe to show to the driver.
+///
+/// The backend replies with `{"error":"..."}`; dumping that raw JSON (or a
+/// Dart "Exception:" prefix) on screen is meaningless to a driver, so known
+/// causes are mapped to plain Indonesian and anything unknown falls back to a
+/// generic line.
+class RideException implements Exception {
+  final String message;
+  const RideException(this.message);
+  @override
+  String toString() => message;
+
+  factory RideException.from(String action, String body) {
+    var reason = '';
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['error'] != null) {
+        reason = decoded['error'].toString();
+      }
+    } catch (_) {}
+
+    const known = {
+      'same party already bid, wait for the other side':
+          'Bid kamu sudah terkirim. Tunggu balasan penumpang dulu.',
+      'trip not found': 'Pesanan ini sudah tidak berlaku.',
+      'invalid trip status': 'Status pesanan sudah berubah. Muat ulang halaman.',
+    };
+    final mapped = known[reason.toLowerCase()];
+    if (mapped != null) return RideException(mapped);
+    if (reason.isEmpty) return RideException('$action. Coba lagi.');
+    return RideException('$action: $reason');
+  }
+}
+
 class RideService {
   final ApiClient _api;
 
@@ -28,7 +62,7 @@ class RideService {
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Gagal menerima trip: ${res.body}');
+    throw RideException.from('Gagal menerima trip', res.body);
   }
 
   Future<void> rejectTrip(String tripId, {String reason = ''}) async {
@@ -42,7 +76,7 @@ class RideService {
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Gagal memulai trip: ${res.body}');
+    throw RideException.from('Gagal memulai trip', res.body);
   }
 
   Future<ActiveTrip> completeTrip(String tripId,
@@ -55,7 +89,7 @@ class RideService {
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Gagal menyelesaikan trip: ${res.body}');
+    throw RideException.from('Gagal menyelesaikan trip', res.body);
   }
 
   Future<ActiveTrip> submitBid(String tripId, double amount, {String reason = '', String bidderRole = 'driver'}) async {
@@ -67,7 +101,7 @@ class RideService {
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Gagal mengirim bid: ${res.body}');
+    throw RideException.from('Gagal mengirim bid', res.body);
   }
 
   Future<ActiveTrip> dealTrip(String tripId) async {
@@ -75,6 +109,6 @@ class RideService {
     if (res.statusCode == 200) {
       return ActiveTrip.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Gagal menerima harga: ${res.body}');
+    throw RideException.from('Gagal menerima harga', res.body);
   }
 }

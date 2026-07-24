@@ -111,13 +111,21 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     Icon(Icons.circle,
                         size: 8,
-                        color: chat.active ? AppTheme.success : AppTheme.textMuted),
+                        color: chat.active
+                            ? AppTheme.success
+                            : (chat.sessionExpired ? AppTheme.danger : AppTheme.textMuted)),
                     const SizedBox(width: 4),
                     Text(
                       chat.active
                           ? 'via WhatsApp • aktif'
-                          : (widget.history ? 'riwayat chat' : 'chat ditutup'),
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                          : chat.sessionExpired
+                              ? 'sesi berakhir — masuk lagi'
+                              : (widget.history ? 'riwayat chat' : 'chat ditutup'),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: chat.sessionExpired
+                              ? AppTheme.danger
+                              : AppTheme.textSecondary),
                     ),
                   ],
                 ),

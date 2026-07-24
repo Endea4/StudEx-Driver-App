@@ -3,6 +3,13 @@ import '../core/network/api_client.dart';
 import '../core/constants.dart';
 import '../models/chat.dart';
 
+/// Thrown when the backend rejects the stored JWT (expired or invalid).
+class SessionExpiredException implements Exception {
+  const SessionExpiredException();
+  @override
+  String toString() => 'Sesi berakhir, silakan masuk lagi';
+}
+
 class ChatService {
   final ApiClient _api;
   ChatService(this._api);
@@ -11,6 +18,9 @@ class ChatService {
   /// Returns (isActive, messages).
   Future<(bool, List<ChatMessage>)> fetchRoom(String tripId) async {
     final res = await _api.get(ApiConstants.chatRoom(tripId));
+    // A 401 means the session expired, not that the room is closed — report it
+    // as such so the UI does not tell the driver "chat ditutup" on a live trip.
+    if (res.statusCode == 401) throw const SessionExpiredException();
     if (res.statusCode != 200) return (false, <ChatMessage>[]);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final room = data['room'] as Map<String, dynamic>?;

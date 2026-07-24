@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/status.dart';
 import '../../core/format.dart';
 import '../../core/geo.dart';
 import '../../providers/history_provider.dart';
@@ -157,21 +158,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.serviceType.toUpperCase(),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary, letterSpacing: 0.5)),
+                    StatusBadge.service(order.serviceType, small: true),
                     Text(ts, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(order.status.toUpperCase(),
-                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-              ),
+              StatusBadge.trip(order.status),
             ],
           ),
           const SizedBox(height: 14),

@@ -26,6 +26,22 @@ class RideProvider extends ChangeNotifier {
   RideOffer? get currentOffer => _currentOffer;
   ActiveTrip? get activeTrip => _activeTrip;
   String? get error => _error;
+
+  /// A one-off failure from a driver action (bid, deal, start, complete).
+  /// Unlike [error] this must NOT replace the screen — the trip is still
+  /// valid, the action just did not go through — so the UI shows it as a
+  /// snackbar and clears it via [clearActionError].
+  String? get actionError => _actionError;
+  String? _actionError;
+
+  void clearActionError() {
+    _actionError = null;
+  }
+
+  void _setActionError(Object e) {
+    _actionError = e.toString().replaceFirst('Exception: ', '');
+    notifyListeners();
+  }
   bool get isLoading => _isLoading;
 
   RideProvider(this._api, this._ws, this._storage) {
@@ -102,24 +118,32 @@ class RideProvider extends ChangeNotifier {
           break;
 
         case 'trip.bargaining':
-          // The bargaining event omits status/service_type/coords; keep the
-          // prior trip fields and force status=bargaining so the driver sees
-          // the bid-response UI (accept the counter or re-bid).
-          _activeTrip = ActiveTrip.fromJson({
-            if (_activeTrip != null) ...{
-              'id': _activeTrip!.id,
-              'service_type': _activeTrip!.serviceType,
-              'pickup_lat': _activeTrip!.pickupLat,
-              'pickup_lng': _activeTrip!.pickupLng,
-              'dest_lat': _activeTrip!.destLat,
-              'dest_lng': _activeTrip!.destLng,
-            },
-            ...data,
-            'status': 'bargaining',
-          });
+          // The bargaining event omits status/service_type/coords. Start from
+          // the event, then backfill anything it left out from the trip we
+          // already hold — putting the event first meant its absent/zero
+          // coords wiped the route, leaving an empty map and "Jemput: -".
+          final merged = <String, dynamic>{...data, 'status': 'bargaining'};
+          void keep(String key, dynamic prior) {
+            final v = merged[key];
+            if (v == null || v == 0 || v == '') merged[key] = prior;
+          }
+          if (_activeTrip != null) {
+            keep('id', _activeTrip!.id);
+            keep('service_type', _activeTrip!.serviceType);
+            keep('pickup_lat', _activeTrip!.pickupLat);
+            keep('pickup_lng', _activeTrip!.pickupLng);
+            keep('dest_lat', _activeTrip!.destLat);
+            keep('dest_lng', _activeTrip!.destLng);
+          }
+          _activeTrip = ActiveTrip.fromJson(merged);
           _state = RideState.bidRequest;
           _error = null;
           notifyListeners();
+          // If we still have no route (e.g. the app restarted mid-negotiation
+          // and held no prior trip), pull the full trip from the backend.
+          if (_activeTrip!.pickupLat == 0 && _activeTrip!.destLat == 0) {
+            _refreshTripFromBackend();
+          }
           break;
 
         case 'trip.cancelled':
@@ -191,7 +215,7 @@ class RideProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setActionError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -210,7 +234,7 @@ class RideProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setActionError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -227,7 +251,7 @@ class RideProvider extends ChangeNotifier {
       _state = RideState.bidRequest;
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setActionError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -242,7 +266,7 @@ class RideProvider extends ChangeNotifier {
       _state = RideState.active;
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setActionError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -285,6 +309,21 @@ class RideProvider extends ChangeNotifier {
   void _setLoading(bool v) {
     _isLoading = v;
     notifyListeners();
+  }
+
+  /// Re-reads the driver's current trip so a partial realtime event cannot
+  /// leave the UI without a pickup/destination.
+  Future<void> _refreshTripFromBackend() async {
+    try {
+      final driverId = _storage.getDriverId();
+      if (driverId == null || driverId.isEmpty) return;
+      final pending = await rideService.fetchPendingTrip(driverId);
+      if (pending == null) return;
+      final full = ActiveTrip.fromJson(pending);
+      if (full.id != _activeTrip?.id) return;
+      _activeTrip = full;
+      notifyListeners();
+    } catch (_) {}
   }
 
   void _setError(String? e) {

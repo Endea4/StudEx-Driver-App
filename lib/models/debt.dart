@@ -25,6 +25,17 @@ class Debt {
     this.paidAt,
   });
 
+  /// True only for money the driver actually owes.
+  ///
+  /// The backend writes one record per completed trip — `earned` for a normal
+  /// cash fare and `unpaid` when the passenger left a debt. Treating every
+  /// record as a debt (the old `is_active` default) listed earnings under
+  /// "Daftar Utang" and inflated the total owed.
+  bool get isOutstanding {
+    final s = status.toLowerCase();
+    return s == 'unpaid' || s == 'disputed' || s == 'partial';
+  }
+
   factory Debt.fromJson(Map<String, dynamic> json) {
     return Debt(
       id: json['id'] ?? '',
