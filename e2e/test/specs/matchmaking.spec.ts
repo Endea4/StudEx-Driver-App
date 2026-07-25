@@ -1,4 +1,4 @@
-const BACKEND_HOST = process.env.BACKEND_HOST || '100.85.144.5';
+const BACKEND_HOST = process.env.BACKEND_HOST || 'localhost';
 const MATCHING_URL = `http://${BACKEND_HOST}:9084`;
 const LOCATION_URL = `http://${BACKEND_HOST}:9081`;
 const AUTH_URL = `http://${BACKEND_HOST}:9080`;
