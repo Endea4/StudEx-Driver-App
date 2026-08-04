@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "667263664885",
+    "project_id": "studex-e4",
+    "storage_bucket": "studex-e4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:667263664885:android:cca6e4823c0781777bfbbc",
+        "android_client_info": {
+          "package_name": "com.studex.driver_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABQaMKofCKtc4IjR6tw14vSEk77Ark5cc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -5,6 +5,7 @@ import '../../core/status.dart';
 import '../../core/states.dart';
 import '../../core/geo.dart';
 import '../../providers/rating_provider.dart';
+import '../../providers/history_provider.dart';
 
 class PendingRatingsScreen extends StatefulWidget {
   const PendingRatingsScreen({super.key});
@@ -112,10 +113,15 @@ class _PendingRatingsScreenState extends State<PendingRatingsScreen> {
     );
 
     if (submitted == true && mounted) {
-      await context.read<RatingProvider>().submitRating(
+      final ok = await context.read<RatingProvider>().submitRating(
             rating.id, selectedScore,
             review: reviewController.text.trim().isEmpty ? null : reviewController.text.trim(),
           );
+      // The rated order doesn't otherwise trigger any refresh elsewhere, so
+      // income/history stay stale until a manual pull-to-refresh.
+      if (ok && mounted) {
+        context.read<HistoryProvider>().fetchOrders();
+      }
     }
     reviewController.dispose();
   }

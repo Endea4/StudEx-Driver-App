@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:async';
-import 'dart:convert';
 import '../../core/theme.dart';
 import '../../core/format.dart';
 import '../../core/geo.dart';
@@ -40,44 +39,33 @@ class _RideScreenState extends State<RideScreen> {
   void initState() {
     super.initState();
     final app = context.read<AppProvider>();
-    _provider = RideProvider(app.apiClient, app.wsClient, app.localStorage);
+    // RideProvider is a top-level, app-lifetime provider (see main.dart) so
+    // its WS subscription survives navigation instead of dying with this
+    // screen — grab the shared instance rather than constructing a new one.
+    _provider = context.read<RideProvider>();
     _provider.addListener(_onProviderChanged);
+    _state = _provider.state;
+    _offer = _provider.currentOffer;
+    _trip = _provider.activeTrip;
+    _error = _provider.error;
+    _loading = _provider.isLoading;
+    _tripHistory = _provider.tripHistory;
+    _loadingTrips = _provider.isLoadingTrips;
 
-    final saved = app.getActiveRideState();
-    if (saved != null) {
-      final st = saved['state'] as String? ?? '';
-      final trip = saved['trip'] as Map<String, dynamic>?;
-      if (trip != null) {
-        if (st == 'bidRequest') {
-          _provider.resumeBidRequest(trip);
-        } else {
-          _provider.resumeActiveTrip(trip);
-        }
+    // Backfill an offer that arrived while this screen wasn't mounted, but
+    // only if the shared provider hasn't already moved past it (e.g. it was
+    // accepted/rejected elsewhere) — otherwise this would regress live state
+    // back to a stale offer.
+    if (_state == RideState.idle) {
+      final offer = app.latestRideOffer;
+      if (offer != null) {
+        _provider.testSimulateOfferFromData(offer);
       }
-      return;
-    }
-
-    final offer = app.latestRideOffer;
-    if (offer != null) {
-      _provider.testSimulateOfferFromData(offer);
     }
     _fetchTrips();
   }
 
-  Future<void> _fetchTrips() async {
-    setState(() => _loadingTrips = true);
-    try {
-      final driverId = context.read<AppProvider>().localStorage.getDriverId();
-      final res = await context.read<AppProvider>().apiClient.get('/trips/driver/$driverId');
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        if (data is List) {
-          setState(() => _tripHistory = data.cast<Map<String, dynamic>>());
-        }
-      }
-    } catch (_) {}
-    setState(() => _loadingTrips = false);
-  }
+  Future<void> _fetchTrips() => _provider.fetchTrips();
 
   void _onProviderChanged() {
     // A rejected action (e.g. bidding twice in a row) leaves the trip intact,
@@ -98,23 +86,16 @@ class _RideScreenState extends State<RideScreen> {
       _trip = _provider.activeTrip;
       _error = _provider.error;
       _loading = _provider.isLoading;
+      _tripHistory = _provider.tripHistory;
+      _loadingTrips = _provider.isLoadingTrips;
     });
   }
 
   @override
   void dispose() {
-    final app = context.read<AppProvider>();
-    if (_state == RideState.active || _state == RideState.bidRequest || _state == RideState.completed) {
-      if (_trip != null) {
-        app.saveRideState(_state.name, _trip!.toJson());
-      }
-    } else {
-      app.clearRideState();
-    }
     _bidController.dispose();
     _bidReasonController.dispose();
     _provider.removeListener(_onProviderChanged);
-    _provider.dispose();
     super.dispose();
   }
 
@@ -138,11 +119,7 @@ class _RideScreenState extends State<RideScreen> {
           if (_state == RideState.completed)
             IconButton(
               icon: const Icon(Icons.close, size: 20),
-              onPressed: () {
-                _provider.reset();
-                context.read<AppProvider>().clearRideState();
-                setState(() { _state = RideState.idle; _offer = null; _trip = null; });
-              },
+              onPressed: () => _provider.reset(),
               tooltip: 'Tutup',
             ),
         ],
@@ -572,6 +549,12 @@ class _RideScreenState extends State<RideScreen> {
           _addrRow('Tujuan', trip.destLat, trip.destLng),
         ]),
         const SizedBox(height: 12),
+        // Chat was only wired into _buildActive() (accepted/deal/in_progress)
+        // -- during bargaining the driver had no way to message the customer
+        // at all, even though the chat room is already open by this point
+        // (it opens on trip.accepted, and bidding only happens after accept).
+        _buildChatButton(trip.id, trip.customerRefId),
+        const SizedBox(height: 12),
         _buildBidCard(),
       ],
     );
@@ -640,7 +623,7 @@ class _RideScreenState extends State<RideScreen> {
           const SizedBox(height: 32),
           SizedBox(width: double.infinity, height: 48,
             child: ElevatedButton(
-              onPressed: () => setState(() { _state = RideState.idle; _offer = null; _trip = null; }),
+              onPressed: () => _provider.reset(),
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               child: const Text('Selesai', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
@@ -656,6 +639,7 @@ class _RideScreenState extends State<RideScreen> {
     final center = LatLng((pickupLat + destLat) / 2, (pickupLng + destLng) / 2);
 
     return Container(
+      width: double.infinity,
       height: 260,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),

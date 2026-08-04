@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../core/network/api_client.dart';
 import '../core/network/websocket_client.dart';
@@ -9,6 +10,8 @@ import '../services/debt_service.dart';
 import '../services/rating_service.dart';
 import '../services/reputation_service.dart';
 import '../services/location_service.dart';
+import '../services/notification_service.dart';
+import '../services/push_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final ApiClient apiClient;
@@ -24,6 +27,7 @@ class AppProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription? _wsSubscription;
 
   // Latest incoming ride offer received via WS
   Map<String, dynamic>? _latestRideOffer;
@@ -33,13 +37,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
   void clearLatestOffer() { _latestRideOffer = null; }
-
-  Map<String, dynamic>? _activeRideState;
-  Map<String, dynamic>? getActiveRideState() => _activeRideState;
-  void saveRideState(String state, Map<String, dynamic>? tripData) {
-    _activeRideState = {'state': state, 'trip': tripData};
-  }
-  void clearRideState() { _activeRideState = null; }
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
@@ -66,7 +63,56 @@ class AppProvider extends ChangeNotifier {
       }
       _isAuthenticated = true;
       wsClient.connect();
+      _syncFcmToken();
     }
+
+    _listenWs();
+    PushService.instance.onTokenRefresh((token) => _sendFcmToken(token));
+  }
+
+  Future<void> _syncFcmToken() async {
+    final token = await PushService.instance.getToken();
+    if (token != null && token.isNotEmpty) {
+      await _sendFcmToken(token);
+    }
+  }
+
+  Future<void> _sendFcmToken(String token) async {
+    try {
+      await authService.updateProfile({'fcm_token': token});
+    } catch (_) {}
+  }
+
+  // Owns the single, app-lifetime WS subscription that drives OS
+  // notifications, so notifications keep firing regardless of which screen
+  // is currently mounted (DashboardScreen previously held this subscription
+  // itself and cancelled it in dispose() the moment the driver navigated
+  // away, silently dropping every event until Dashboard was reopened).
+  void _listenWs() {
+    _wsSubscription = wsClient.stream.listen((event) {
+      final type = event['type'] as String? ?? '';
+      if (type == 'match.completed') {
+        NotificationService.instance.show('Pesanan Baru!', 'Ada pesanan masuk');
+        setLatestRideOffer(event['data'] as Map<String, dynamic>?);
+      } else if (type == 'trip.created') {
+        NotificationService.instance.show('Trip Dibuat', 'Trip menunggu konfirmasi');
+      } else if (type == 'trip.started') {
+        NotificationService.instance.show('Trip Dimulai', 'Perjalanan dimulai');
+      } else if (type == 'trip.completed') {
+        NotificationService.instance.show('Trip Selesai', 'Perjalanan selesai');
+      } else if (type == 'trip.cancelled') {
+        NotificationService.instance.show('Trip Dibatalkan', 'Perjalanan dibatalkan');
+      }
+      // match.timeout ("tidak ada driver tersedia") is addressed to the
+      // customer who is still waiting for a match; it says nothing to a
+      // driver, so it is deliberately not surfaced here.
+    });
+  }
+
+  @override
+  void dispose() {
+    _wsSubscription?.cancel();
+    super.dispose();
   }
 
   void _setLoading(bool loading) {
@@ -100,6 +146,7 @@ class AppProvider extends ChangeNotifier {
       }
       _isAuthenticated = true;
       wsClient.connect();
+      _syncFcmToken();
       notifyListeners();
       return true;
     } catch (e) {

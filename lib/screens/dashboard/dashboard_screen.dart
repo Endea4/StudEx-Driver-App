@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/status.dart';
@@ -19,13 +18,11 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _gpsEnabled = false;
   String _timeFilter = 'today';
-  StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _listenWsEvents();
       _initAsync();
     });
   }
@@ -51,67 +48,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() => _gpsEnabled = true);
       }
     }
-  }
-
-  void _listenWsEvents() {
-    final app = context.read<AppProvider>();
-    _wsSubscription = app.wsClient.stream.listen((event) {
-      if (!mounted) return;
-      final type = event['type'] as String? ?? '';
-      if (type == 'match.completed') {
-        _showNotification('Pesanan Baru!', 'Ada pesanan masuk', Icons.local_shipping, AppTheme.brandCyan);
-        context.read<AppProvider>().setLatestRideOffer(event['data'] as Map<String, dynamic>?);
-      } else if (type == 'trip.created') {
-        _showNotification('Trip Dibuat', 'Trip menunggu konfirmasi', Icons.assignment, AppTheme.warning);
-      } else if (type == 'trip.started') {
-        _showNotification('Trip Dimulai', 'Perjalanan dimulai', Icons.directions_bike, AppTheme.success);
-      } else if (type == 'trip.completed') {
-        _showNotification('Trip Selesai', 'Perjalanan selesai', Icons.check_circle, AppTheme.success);
-      } else if (type == 'trip.cancelled') {
-        _showNotification('Trip Dibatalkan', 'Perjalanan dibatalkan', Icons.cancel, AppTheme.danger);
-      }
-      // match.timeout ("tidak ada driver tersedia") is addressed to the
-      // customer who is still waiting for a match. It says nothing to a
-      // driver, so it is deliberately not surfaced here.
-    });
-  }
-
-  void _showNotification(String title, String body, IconData icon, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-                  Text(body, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.surfaceBorder),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   Future<void> _toggleStatus(String status) async {
@@ -676,9 +612,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _wsSubscription?.cancel();
-    super.dispose();
-  }
 }

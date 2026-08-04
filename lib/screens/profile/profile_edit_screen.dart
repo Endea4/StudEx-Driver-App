@@ -140,7 +140,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             const SizedBox(height: 28),
             _buildSection('Kendaraan'),
             const SizedBox(height: 12),
-            _buildField('Tipe Kendaraan', _vehicleTypeController, Icons.motorcycle, hint: 'Contoh: Matic, Manual'),
+            _buildField('Tipe Kendaraan', _vehicleTypeController, Icons.motorcycle, hint: 'Contoh: Matic, Manual, atau merk (Beat, Vario, dll)'),
             const SizedBox(height: 14),
             _buildField('Plat Nomor', _plateController, Icons.pin_outlined, hint: 'Contoh: AB 1234 CD'),
             const SizedBox(height: 40),
@@ -212,13 +212,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Gender', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted, letterSpacing: 0.3)),
+        const Text('Jenis Kelamin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMuted, letterSpacing: 0.3)),
         const SizedBox(height: 8),
         Row(
           children: [
-            _genderChip('Male', 'Male', Icons.male),
+            _genderChip('Laki-laki', 'Male', Icons.male),
             const SizedBox(width: 10),
-            _genderChip('Female', 'Female', Icons.female),
+            _genderChip('Perempuan', 'Female', Icons.female),
           ],
         ),
       ],

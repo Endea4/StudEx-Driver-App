@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../core/network/api_client.dart';
 import '../core/network/websocket_client.dart';
@@ -26,6 +27,28 @@ class RideProvider extends ChangeNotifier {
   RideOffer? get currentOffer => _currentOffer;
   ActiveTrip? get activeTrip => _activeTrip;
   String? get error => _error;
+
+  List<Map<String, dynamic>> _tripHistory = [];
+  bool _isLoadingTrips = false;
+  List<Map<String, dynamic>> get tripHistory => _tripHistory;
+  bool get isLoadingTrips => _isLoadingTrips;
+
+  Future<void> fetchTrips() async {
+    _isLoadingTrips = true;
+    notifyListeners();
+    try {
+      final driverId = _storage.getDriverId();
+      final res = await _api.get('/trips/driver/$driverId');
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is List) {
+          _tripHistory = data.cast<Map<String, dynamic>>();
+        }
+      }
+    } catch (_) {}
+    _isLoadingTrips = false;
+    notifyListeners();
+  }
 
   /// A one-off failure from a driver action (bid, deal, start, complete).
   /// Unlike [error] this must NOT replace the screen — the trip is still
@@ -115,6 +138,10 @@ class RideProvider extends ChangeNotifier {
           }
           _state = RideState.completed;
           notifyListeners();
+          // The "Ride" menu's trip-history list is a separate REST snapshot;
+          // refresh it now so it reflects the completion without requiring
+          // the driver to close and reopen the screen.
+          fetchTrips();
           break;
 
         case 'trip.bargaining':
@@ -148,6 +175,7 @@ class RideProvider extends ChangeNotifier {
 
         case 'trip.cancelled':
           _reset();
+          fetchTrips();
           break;
       }
     });
@@ -232,6 +260,7 @@ class RideProvider extends ChangeNotifier {
         debtAmount: debtAmount,
       );
       notifyListeners();
+      fetchTrips();
       return true;
     } catch (e) {
       _setActionError(e);

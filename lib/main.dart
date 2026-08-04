@@ -11,7 +11,10 @@ import 'providers/debt_provider.dart';
 import 'providers/rating_provider.dart';
 import 'providers/reputation_provider.dart';
 import 'providers/chat_provider.dart';
+import 'providers/ride_provider.dart';
 import 'services/chat_service.dart';
+import 'services/notification_service.dart';
+import 'services/push_service.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
@@ -39,6 +42,9 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final localStorage = LocalStorage(prefs);
 
+  await NotificationService.instance.init();
+  await PushService.instance.init();
+
   final appProvider = AppProvider(localStorage: localStorage);
 
   runApp(
@@ -49,7 +55,7 @@ void main() async {
           create: (_) => DriverProvider(appProvider.authService, appProvider.apiClient),
         ),
         ChangeNotifierProvider(
-          create: (_) => HistoryProvider(appProvider.historyService),
+          create: (_) => HistoryProvider(appProvider.historyService, appProvider.wsClient),
         ),
         ChangeNotifierProvider(
           create: (_) => DebtProvider(appProvider.debtService),
@@ -59,6 +65,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => ReputationProvider(appProvider.reputationService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => RideProvider(appProvider.apiClient, appProvider.wsClient, appProvider.localStorage),
         ),
         ChangeNotifierProvider(
           create: (_) => ChatProvider(
