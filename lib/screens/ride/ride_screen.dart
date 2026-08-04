@@ -18,6 +18,7 @@ import '../../providers/chat_provider.dart';
 import '../../models/ride.dart';
 import '../../services/location_service.dart';
 import '../../core/storage/local_storage.dart';
+import 'trip_detail_screen.dart';
 
 class RideScreen extends StatefulWidget {
   const RideScreen({super.key});
@@ -685,8 +686,6 @@ class _RideScreenState extends State<RideScreen> {
 
   void _onTripTap(Map<String, dynamic> trip) {
     final status = trip['status'] ?? '';
-    final color = _statusColor(status);
-    final label = _statusLabel(status);
 
     if (status == 'pending_acceptance') {
       _provider.testSimulateOfferFromData({
@@ -734,58 +733,11 @@ class _RideScreenState extends State<RideScreen> {
         'customer_ref_id': trip['customer_ref_id'] ?? '',
       });
     } else {
-      _showTripDetailDialog(trip, label, color);
+      // Completed/rejected/cancelled trips have nothing left to resume into
+      // a live screen for -- show a static pickup/dest map instead of the
+      // old text-only modal.
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)));
     }
-  }
-
-  void _showTripDetailDialog(Map<String, dynamic> trip, String label, Color color) {
-    final price = (trip['final_price'] ?? 0).toInt();
-    final bid = (trip['current_bid_price'] ?? 0).toInt();
-    final pl = (trip['pickup_lat'] ?? 0).toDouble();
-    final plng = (trip['pickup_lng'] ?? 0).toDouble();
-    final dl = (trip['dest_lat'] ?? 0).toDouble();
-    final dlng = (trip['dest_lng'] ?? 0).toDouble();
-    final ts = trip['updated_at'] ?? trip['created_at'] ?? '';
-    final tsShort = formatDateTime(ts);
-    final paymentStatus = (trip['payment_status'] ?? '').toString();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 12, height: 12,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _detailRow('Kode Order', shortCode(trip['order_id'])),
-            _detailBadgeRow('Status', StatusBadge.trip((trip['status'] ?? '').toString(), small: true)),
-            if (paymentStatus.isNotEmpty)
-              _detailBadgeRow('Pembayaran', StatusBadge.payment(paymentStatus, small: true)),
-            _detailRow('Harga', 'Rp ${formatMoney(price)}'),
-            if (bid > 0) _detailRow('Bid', 'Rp ${formatMoney(bid)}'),
-            _detailAddrRow('Jemput', pl, plng),
-            _detailAddrRow('Tujuan', dl, dlng),
-            if (tsShort.isNotEmpty) _detailRow('Waktu', tsShort),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showRejectDialog() {
@@ -990,31 +942,6 @@ class _RideScreenState extends State<RideScreen> {
       await _provider.completeTrip(isDebt: true, debtAmount: amount);
     }
   }
-  // Detail row whose value is an enum badge instead of raw text.
-  Widget _detailBadgeRow(String label, Widget badge) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(children: [
-      SizedBox(width: 110, child: Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted))),
-      badge,
-    ]),
-  );
-
-  Widget _detailRow(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
-      Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, fontFamily: 'monospace'))),
-    ]),
-  );
-
-  Widget _detailAddrRow(String label, double lat, double lng) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted))),
-      Expanded(child: AddressText(lat, lng, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary))),
-    ]),
-  );
-
   Widget _buildActionButton(String label, IconData icon, Color color, VoidCallback onPressed) => SizedBox(
     width: double.infinity, height: 52,
     child: ElevatedButton.icon(
