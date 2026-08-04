@@ -5,6 +5,7 @@ class LocalStorage {
   static const _keyPhone = 'driver_phone';
   static const _keyDriverId = 'driver_id';
   static const _keyGpsEnabled = 'gps_enabled';
+  static const _keyMapTheme = 'map_theme';
 
   final SharedPreferences _prefs;
 
@@ -33,6 +34,14 @@ class LocalStorage {
   }
 
   bool getGpsEnabled() => _prefs.getBool(_keyGpsEnabled) ?? false;
+
+  // Map light/dark preference -- a device/display setting, so it's
+  // intentionally left out of clear() and survives logout.
+  Future<void> saveMapTheme(String theme) async {
+    await _prefs.setString(_keyMapTheme, theme);
+  }
+
+  String getMapTheme() => _prefs.getString(_keyMapTheme) ?? 'light';
 
   Future<void> clear() async {
     await _prefs.remove(_keyToken);

@@ -17,6 +17,7 @@ import '../../providers/app_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../models/ride.dart';
 import '../../services/location_service.dart';
+import '../../core/storage/local_storage.dart';
 
 class RideScreen extends StatefulWidget {
   const RideScreen({super.key});
@@ -36,6 +37,13 @@ class _RideScreenState extends State<RideScreen> {
   String? _error;
   bool _loading = false;
   bool _showBid = false;
+  // Both floating panels are collapsible so the map stays the dominant
+  // element. The top card (pure info -- status/address/price) starts
+  // collapsed since the map already shows pickup/dest/route visually; the
+  // bottom sheet (contains actionable buttons) starts expanded so nothing
+  // actionable is hidden by default.
+  bool _topCardExpanded = false;
+  bool _bottomSheetExpanded = true;
   List<Map<String, dynamic>> _tripHistory = [];
   bool _loadingTrips = false;
 
@@ -336,13 +344,20 @@ class _RideScreenState extends State<RideScreen> {
         Positioned.fill(
           child: _LiveTripMap(pickupLat: offer.pickupLat, pickupLng: offer.pickupLng, destLat: offer.destLat, destLng: offer.destLng, status: null),
         ),
-        _floatingTopCard(context, [
-          _addrRow('Jemput', offer.pickupLat, offer.pickupLng),
-          _addrRow('Tujuan', offer.destLat, offer.destLng),
-          _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
-          _infoRow('Estimasi Harga', 'Rp ${formatMoney(offer.estimatedPrice.toInt())}'),
-          _badgeRow('Layanan', StatusBadge.service(offer.serviceType)),
-        ]),
+        _floatingTopCard(
+          context,
+          [
+            _addrRow('Jemput', offer.pickupLat, offer.pickupLng),
+            _addrRow('Tujuan', offer.destLat, offer.destLng),
+            _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
+            _infoRow('Estimasi Harga', 'Rp ${formatMoney(offer.estimatedPrice.toInt())}'),
+            _badgeRow('Layanan', StatusBadge.service(offer.serviceType)),
+          ],
+          collapsedSummary: Text(
+            'Rp ${formatMoney(offer.estimatedPrice.toInt())} · ${distance.toStringAsFixed(1)} km',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+          ),
+        ),
         _floatingBottomSheet(context, [
           Row(
             children: [
@@ -395,15 +410,28 @@ class _RideScreenState extends State<RideScreen> {
         Positioned.fill(
           child: _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
         ),
-        _floatingTopCard(context, [
-          _buildStatusBanner(trip.status),
-          const SizedBox(height: 10),
-          _badgeRow('Status', StatusBadge.trip(trip.status)),
-          _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
-          _addrRow('Tujuan', trip.destLat, trip.destLng),
-          _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
-          if (trip.finalPrice > 0) _infoRow('Harga', 'Rp ${formatMoney(trip.finalPrice.toInt())}'),
-        ]),
+        _floatingTopCard(
+          context,
+          [
+            _buildStatusBanner(trip.status),
+            const SizedBox(height: 10),
+            _badgeRow('Status', StatusBadge.trip(trip.status)),
+            _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
+            _addrRow('Tujuan', trip.destLat, trip.destLng),
+            _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
+            if (trip.finalPrice > 0) _infoRow('Harga', 'Rp ${formatMoney(trip.finalPrice.toInt())}'),
+          ],
+          collapsedSummary: Row(
+            children: [
+              StatusBadge.trip(trip.status),
+              if (trip.finalPrice > 0) ...[
+                const SizedBox(width: 8),
+                Text('Rp ${formatMoney(trip.finalPrice.toInt())}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+              ],
+            ],
+          ),
+        ),
         _floatingBottomSheet(context, [
           if (trip.status == 'accepted' || trip.status == 'deal' || trip.status == 'in_progress') ...[
             _buildChatButton(trip.id, trip.customerRefId),
@@ -430,6 +458,9 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  // Compact single-row chat entry point -- was a taller two-line card with
+  // a subtitle, shrunk so it doesn't crowd the floating bottom sheet and
+  // leaves more of the map visible.
   Widget _buildChatButton(String tripId, String customerRefId) {
     final chat = context.watch<ChatProvider>();
     final unread = chat.tripId == tripId ? chat.unread : 0;
@@ -447,49 +478,29 @@ class _RideScreenState extends State<RideScreen> {
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             border: Border.all(color: AppTheme.brandCyan.withValues(alpha: 0.25)),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.brandCyan.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-                child: const Icon(Icons.chat_bubble_rounded,
-                    color: AppTheme.brandCyanDark, size: 20),
-              ),
-              const SizedBox(width: 14),
+              const Icon(Icons.chat_bubble_rounded, color: AppTheme.brandCyanDark, size: 18),
+              const SizedBox(width: 10),
               const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Chat dengan Customer',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.brandCyanDark)),
-                    SizedBox(height: 2),
-                    Text('Terhubung via WhatsApp',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                  ],
-                ),
+                child: Text('Chat dengan Customer',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandCyanDark)),
               ),
               if (unread > 0)
                 Container(
                   margin: const EdgeInsets.only(right: 6),
-                  constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                   alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                       color: AppTheme.danger,
-                      borderRadius: BorderRadius.circular(11)),
+                      borderRadius: BorderRadius.circular(9)),
                   child: Text('$unread',
                       style: const TextStyle(
-                          color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                 ),
-              const Icon(Icons.chevron_right, color: AppTheme.brandCyanDark),
+              const Icon(Icons.chevron_right, color: AppTheme.brandCyanDark, size: 18),
             ],
           ),
         ),
@@ -806,24 +817,58 @@ class _RideScreenState extends State<RideScreen> {
 
   // Floating info card anchored below the transparent AppBar, over the
   // fullscreen map -- mirrors user-web-temp/index.html's .top-card overlay.
-  Widget _floatingTopCard(BuildContext context, List<Widget> rows) => Positioned(
+  // Collapsible (tap the header) so pure-info content like the trip status
+  // banner doesn't crowd the map out by default.
+  Widget _floatingTopCard(BuildContext context, List<Widget> rows, {Widget? collapsedSummary}) => Positioned(
     top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
     left: 16,
     right: 16,
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: AppTheme.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         boxShadow: AppTheme.shadowMd,
       ),
-      child: Column(children: rows),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            onTap: () => setState(() => _topCardExpanded = !_topCardExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: !_topCardExpanded && collapsedSummary != null
+                        ? collapsedSummary
+                        : const Text('Detail Perjalanan',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.6)),
+                  ),
+                  Icon(_topCardExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 20, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+          if (_topCardExpanded) ...[
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            ...rows,
+            const SizedBox(height: 4),
+          ],
+        ],
+      ),
     ),
   );
 
   // Floating action sheet anchored to the bottom of the screen, over the
   // fullscreen map -- mirrors user-web-temp/index.html's .sheet, scrollable
   // so it never overflows even with the bid input expanded on a short phone.
+  // Collapsible via the drag-handle-style header (defaults to expanded so
+  // actionable buttons stay reachable without an extra tap).
   Widget _floatingBottomSheet(BuildContext context, List<Widget> children) => Positioned(
     left: 16,
     right: 16,
@@ -832,13 +877,37 @@ class _RideScreenState extends State<RideScreen> {
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.55),
       child: SingleChildScrollView(
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: AppTheme.surface.withValues(alpha: 0.97),
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             boxShadow: AppTheme.shadowMd,
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: children),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                onTap: () => setState(() => _bottomSheetExpanded = !_bottomSheetExpanded),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppTheme.surfaceBorder, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                ),
+              ),
+              if (_bottomSheetExpanded) ...[
+                const SizedBox(height: 4),
+                ...children,
+                const SizedBox(height: 4),
+              ],
+            ],
+          ),
         ),
       ),
     ),
@@ -993,18 +1062,37 @@ class _LiveTripMap extends StatefulWidget {
 class _LiveTripMapState extends State<_LiveTripMap> {
   static const _minRerouteInterval = Duration(seconds: 20);
 
+  // Same CartoDB light/dark tile pair as the temp customer web app
+  // (user-web-temp/index.html), toggled via a floating button and
+  // persisted so the choice survives app restarts.
+  static const _tileUrls = {
+    'light': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    'dark': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  };
+
   final _mapController = MapController();
   LocationService? _locationService;
+  LocalStorage? _storage;
   List<LatLng>? _routePoints;
   DateTime? _lastRerouteAt;
+  String _mapTheme = 'light';
 
   @override
   void initState() {
     super.initState();
-    _locationService = context.read<AppProvider>().locationService;
+    final app = context.read<AppProvider>();
+    _locationService = app.locationService;
+    _storage = app.localStorage;
+    _mapTheme = _storage!.getMapTheme();
     _locationService!.positionNotifier.addListener(_onPosition);
     final pos = _locationService!.positionNotifier.value;
     if (pos != null) _maybeReroute(pos);
+  }
+
+  void _toggleTheme() {
+    final next = _mapTheme == 'dark' ? 'light' : 'dark';
+    setState(() => _mapTheme = next);
+    _storage?.saveMapTheme(next);
   }
 
   @override
@@ -1069,71 +1157,84 @@ class _LiveTripMapState extends State<_LiveTripMap> {
     _mapController.move(LatLng(pos.latitude, pos.longitude), zoom < 15 ? 16 : zoom);
   }
 
+  Widget _mapFab({required IconData icon, required Color color, VoidCallback? onTap}) => Material(
+    color: Colors.white,
+    shape: const CircleBorder(),
+    elevation: 3,
+    child: InkWell(
+      customBorder: const CircleBorder(),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, size: 20, color: color),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final pickup = LatLng(widget.pickupLat, widget.pickupLng);
     final dropoff = LatLng(widget.destLat, widget.destLng);
     final center = LatLng((widget.pickupLat + widget.destLat) / 2, (widget.pickupLng + widget.destLng) / 2);
 
-    return Container(
-      width: double.infinity,
-      height: 260,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            ValueListenableBuilder<Position?>(
-              valueListenable: _locationService!.positionNotifier,
-              builder: (context, pos, _) => FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(initialCenter: center, initialZoom: 13),
-                children: [
-                  TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.studex.driver_app'),
-                  if (_routePoints != null)
-                    PolylineLayer(polylines: [
-                      Polyline(points: _routePoints!, strokeWidth: 4, color: AppTheme.accent),
-                    ]),
-                  MarkerLayer(markers: [
-                    Marker(point: pickup, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 36)),
-                    Marker(point: dropoff, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.red, size: 36)),
-                    if (pos != null)
-                      Marker(
-                        point: LatLng(pos.latitude, pos.longitude),
-                        width: 44,
-                        height: 44,
-                        child: const Icon(Icons.two_wheeler, color: AppTheme.accent, size: 32),
-                      ),
-                  ]),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 10,
-              bottom: 10,
-              child: ValueListenableBuilder<Position?>(
-                valueListenable: _locationService!.positionNotifier,
-                builder: (context, pos, _) => Material(
-                  color: Colors.white,
-                  shape: const CircleBorder(),
-                  elevation: 3,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
+    return Stack(
+      children: [
+        ValueListenableBuilder<Position?>(
+          valueListenable: _locationService!.positionNotifier,
+          builder: (context, pos, _) => FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(initialCenter: center, initialZoom: 13),
+            children: [
+              TileLayer(urlTemplate: _tileUrls[_mapTheme]!, userAgentPackageName: 'com.studex.driver_app'),
+              if (_routePoints != null)
+                PolylineLayer(polylines: [
+                  Polyline(points: _routePoints!, strokeWidth: 4, color: AppTheme.accent),
+                ]),
+              MarkerLayer(markers: [
+                Marker(point: pickup, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 36)),
+                Marker(point: dropoff, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.red, size: 36)),
+                if (pos != null)
+                  Marker(
+                    point: LatLng(pos.latitude, pos.longitude),
+                    width: 44,
+                    height: 44,
+                    child: const Icon(Icons.two_wheeler, color: AppTheme.accent, size: 32),
+                  ),
+              ]),
+            ],
+          ),
+        ),
+        // Map controls sit vertically centered on the right edge -- clear of
+        // both the floating top card and bottom sheet regardless of their
+        // collapsed/expanded state, unlike a fixed bottom-corner position.
+        Positioned(
+          top: 0,
+          bottom: 0,
+          right: 10,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _mapFab(
+                  icon: _mapTheme == 'dark' ? Icons.light_mode : Icons.dark_mode,
+                  color: AppTheme.accent,
+                  onTap: _toggleTheme,
+                ),
+                const SizedBox(height: 10),
+                ValueListenableBuilder<Position?>(
+                  valueListenable: _locationService!.positionNotifier,
+                  builder: (context, pos, _) => _mapFab(
+                    icon: Icons.my_location,
+                    color: pos == null ? AppTheme.textMuted : AppTheme.accent,
                     onTap: pos == null ? null : () => _recenter(pos),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(Icons.my_location, size: 20, color: pos == null ? AppTheme.textMuted : AppTheme.accent),
-                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
