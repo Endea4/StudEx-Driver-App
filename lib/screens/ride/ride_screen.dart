@@ -103,23 +103,36 @@ class _RideScreenState extends State<RideScreen> {
     super.dispose();
   }
 
+  // The map states (offer/active/bid) go fullscreen -- map fills the whole
+  // screen and the AppBar floats transparently over it, mirroring
+  // user-web-temp/index.html's layout (fullscreen map + floating overlays)
+  // instead of the old scrolling list of stacked cards below a fixed map.
+  bool get _isMapState =>
+      _state == RideState.offer || _state == RideState.active || _state == RideState.bidRequest;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bg,
+      extendBodyBehindAppBar: _isMapState,
       appBar: AppBar(
-        title: const Text('Ride', style: TextStyle(fontWeight: FontWeight.w700)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: _isMapState ? Colors.transparent : null,
+        title: _isMapState ? null : const Text('Ride', style: TextStyle(fontWeight: FontWeight.w700)),
+        leading: _isMapState
+            ? _floatingAppBarIcon(Icons.arrow_back_ios_new, () => Navigator.pop(context))
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
         actions: [
           if (_state == RideState.offer)
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => _showRejectDialog(),
-              tooltip: 'Cancel',
-            ),
+            _isMapState
+                ? _floatingAppBarIcon(Icons.close, () => _showRejectDialog(), tooltip: 'Cancel')
+                : IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => _showRejectDialog(),
+                    tooltip: 'Cancel',
+                  ),
           if (_state == RideState.completed)
             IconButton(
               icon: const Icon(Icons.close, size: 20),
@@ -318,57 +331,58 @@ class _RideScreenState extends State<RideScreen> {
   Widget _buildOffer() {
     final offer = _offer!;
     final distance = _calcDistance(offer.pickupLat, offer.pickupLng, offer.destLat, offer.destLng);
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        _LiveTripMap(pickupLat: offer.pickupLat, pickupLng: offer.pickupLng, destLat: offer.destLat, destLng: offer.destLng, status: null),
-        const SizedBox(height: 16),
-        _buildInfoCard([
+        Positioned.fill(
+          child: _LiveTripMap(pickupLat: offer.pickupLat, pickupLng: offer.pickupLng, destLat: offer.destLat, destLng: offer.destLng, status: null),
+        ),
+        _floatingTopCard(context, [
           _addrRow('Jemput', offer.pickupLat, offer.pickupLng),
           _addrRow('Tujuan', offer.destLat, offer.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
           _infoRow('Estimasi Harga', 'Rp ${formatMoney(offer.estimatedPrice.toInt())}'),
           _badgeRow('Layanan', StatusBadge.service(offer.serviceType)),
         ]),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final app = context.read<AppProvider>();
-                    final ok = await _provider.acceptOffer();
-                    if (ok) app.clearLatestOffer();
-                  },
-                  icon: const Icon(Icons.check, size: 20),
-                  label: const Text('Terima', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.success, foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        _floatingBottomSheet(context, [
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final app = context.read<AppProvider>();
+                      final ok = await _provider.acceptOffer();
+                      if (ok) app.clearLatestOffer();
+                    },
+                    icon: const Icon(Icons.check, size: 20),
+                    label: const Text('Terima', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.success, foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showRejectDialog(),
-                  icon: const Icon(Icons.close, size: 20),
-                  label: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.danger,
-                    side: const BorderSide(color: AppTheme.danger),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRejectDialog(),
+                    icon: const Icon(Icons.close, size: 20),
+                    label: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.danger,
+                      side: const BorderSide(color: AppTheme.danger),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ]),
       ],
     );
   }
@@ -376,41 +390,42 @@ class _RideScreenState extends State<RideScreen> {
   Widget _buildActive() {
     final trip = _trip!;
     final distance = _calcDistance(trip.pickupLat, trip.pickupLng, trip.destLat, trip.destLng);
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
-        const SizedBox(height: 16),
-        _buildStatusBanner(trip.status),
-        const SizedBox(height: 12),
-        _buildInfoCard([
+        Positioned.fill(
+          child: _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
+        ),
+        _floatingTopCard(context, [
+          _buildStatusBanner(trip.status),
+          const SizedBox(height: 10),
           _badgeRow('Status', StatusBadge.trip(trip.status)),
           _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
           _addrRow('Tujuan', trip.destLat, trip.destLng),
           _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
           if (trip.finalPrice > 0) _infoRow('Harga', 'Rp ${formatMoney(trip.finalPrice.toInt())}'),
         ]),
-        if (trip.status == 'accepted' || trip.status == 'deal' || trip.status == 'in_progress') ...[
-          const SizedBox(height: 12),
-          _buildChatButton(trip.id, trip.customerRefId),
-        ],
-        const SizedBox(height: 24),
-        if (trip.status == 'created' || trip.status == 'pending' || trip.status == 'accepted' || trip.status == 'deal') ...[
-          _buildActionButton('Mulai Perjalanan', Icons.play_arrow, AppTheme.accent, () => _provider.startTrip()),
-          const SizedBox(height: 12),
-          if (!_showBid)
-            _buildActionButton('Bid Harga', Icons.gavel, AppTheme.warning, () => setState(() => _showBid = true)),
-          if (_showBid) ...[
-            _buildBidInput(),
+        _floatingBottomSheet(context, [
+          if (trip.status == 'accepted' || trip.status == 'deal' || trip.status == 'in_progress') ...[
+            _buildChatButton(trip.id, trip.customerRefId),
             const SizedBox(height: 12),
-            TextButton(onPressed: () => setState(() => _showBid = false), child: const Text('Tutup Bid')),
           ],
-        ],
-        if (trip.status == 'in_progress') ...[
-          _buildActionButton('Selesai — Tunai', Icons.money, AppTheme.success, () => _provider.completeTrip(isDebt: false)),
-          const SizedBox(height: 12),
-          _buildActionButton('Selesai — Utang', Icons.money_off, AppTheme.warning, () => _completeWithDebt(trip.finalPrice)),
-        ],
+          if (trip.status == 'created' || trip.status == 'pending' || trip.status == 'accepted' || trip.status == 'deal') ...[
+            _buildActionButton('Mulai Perjalanan', Icons.play_arrow, AppTheme.accent, () => _provider.startTrip()),
+            const SizedBox(height: 12),
+            if (!_showBid)
+              _buildActionButton('Bid Harga', Icons.gavel, AppTheme.warning, () => setState(() => _showBid = true)),
+            if (_showBid) ...[
+              _buildBidInput(),
+              const SizedBox(height: 12),
+              TextButton(onPressed: () => setState(() => _showBid = false), child: const Text('Tutup Bid')),
+            ],
+          ],
+          if (trip.status == 'in_progress') ...[
+            _buildActionButton('Selesai — Tunai', Icons.money, AppTheme.success, () => _provider.completeTrip(isDebt: false)),
+            const SizedBox(height: 12),
+            _buildActionButton('Selesai — Utang', Icons.money_off, AppTheme.warning, () => _completeWithDebt(trip.finalPrice)),
+          ],
+        ]),
       ],
     );
   }
@@ -543,23 +558,24 @@ class _RideScreenState extends State<RideScreen> {
 
   Widget _buildBid() {
     final trip = _trip!;
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
-        const SizedBox(height: 16),
-        _buildInfoCard([
+        Positioned.fill(
+          child: _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
+        ),
+        _floatingTopCard(context, [
           _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
           _addrRow('Tujuan', trip.destLat, trip.destLng),
         ]),
-        const SizedBox(height: 12),
-        // Chat was only wired into _buildActive() (accepted/deal/in_progress)
-        // -- during bargaining the driver had no way to message the customer
-        // at all, even though the chat room is already open by this point
-        // (it opens on trip.accepted, and bidding only happens after accept).
-        _buildChatButton(trip.id, trip.customerRefId),
-        const SizedBox(height: 12),
-        _buildBidCard(),
+        _floatingBottomSheet(context, [
+          // Chat was only wired into _buildActive() (accepted/deal/in_progress)
+          // -- during bargaining the driver had no way to message the customer
+          // at all, even though the chat room is already open by this point
+          // (it opens on trip.accepted, and bidding only happens after accept).
+          _buildChatButton(trip.id, trip.customerRefId),
+          const SizedBox(height: 12),
+          _buildBidCard(),
+        ]),
       ],
     );
   }
@@ -788,10 +804,60 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
-  Widget _buildInfoCard(List<Widget> rows) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-    decoration: AppTheme.cardDecoration(),
-    child: Column(children: rows),
+  // Floating info card anchored below the transparent AppBar, over the
+  // fullscreen map -- mirrors user-web-temp/index.html's .top-card overlay.
+  Widget _floatingTopCard(BuildContext context, List<Widget> rows) => Positioned(
+    top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+    left: 16,
+    right: 16,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        boxShadow: AppTheme.shadowMd,
+      ),
+      child: Column(children: rows),
+    ),
+  );
+
+  // Floating action sheet anchored to the bottom of the screen, over the
+  // fullscreen map -- mirrors user-web-temp/index.html's .sheet, scrollable
+  // so it never overflows even with the bid input expanded on a short phone.
+  Widget _floatingBottomSheet(BuildContext context, List<Widget> children) => Positioned(
+    left: 16,
+    right: 16,
+    bottom: MediaQuery.paddingOf(context).bottom + 16,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.55),
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface.withValues(alpha: 0.97),
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            boxShadow: AppTheme.shadowMd,
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: children),
+        ),
+      ),
+    ),
+  );
+
+  // Small circular floating button used for the AppBar's leading/action
+  // icons when the AppBar itself is transparent over the fullscreen map.
+  Widget _floatingAppBarIcon(IconData icon, VoidCallback onPressed, {String? tooltip}) => Padding(
+    padding: const EdgeInsets.all(8),
+    child: Material(
+      color: AppTheme.surface.withValues(alpha: 0.96),
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: IconButton(
+        icon: Icon(icon, size: 20, color: AppTheme.textPrimary),
+        onPressed: onPressed,
+        tooltip: tooltip,
+      ),
+    ),
   );
 
   // Row whose value is an enum, shown as a coloured badge rather than a raw
