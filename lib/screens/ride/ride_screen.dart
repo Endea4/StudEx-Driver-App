@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'dart:async';
 import '../../core/theme.dart';
@@ -13,6 +16,7 @@ import '../../providers/ride_provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../models/ride.dart';
+import '../../services/location_service.dart';
 
 class RideScreen extends StatefulWidget {
   const RideScreen({super.key});
@@ -317,7 +321,7 @@ class _RideScreenState extends State<RideScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildMap(offer.pickupLat, offer.pickupLng, offer.destLat, offer.destLng),
+        _LiveTripMap(pickupLat: offer.pickupLat, pickupLng: offer.pickupLng, destLat: offer.destLat, destLng: offer.destLng, status: null),
         const SizedBox(height: 16),
         _buildInfoCard([
           _addrRow('Jemput', offer.pickupLat, offer.pickupLng),
@@ -375,7 +379,7 @@ class _RideScreenState extends State<RideScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildMap(trip.pickupLat, trip.pickupLng, trip.destLat, trip.destLng),
+        _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
         const SizedBox(height: 16),
         _buildStatusBanner(trip.status),
         const SizedBox(height: 12),
@@ -542,7 +546,7 @@ class _RideScreenState extends State<RideScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildMap(trip.pickupLat, trip.pickupLng, trip.destLat, trip.destLng),
+        _LiveTripMap(pickupLat: trip.pickupLat, pickupLng: trip.pickupLng, destLat: trip.destLat, destLng: trip.destLng, status: trip.status),
         const SizedBox(height: 16),
         _buildInfoCard([
           _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
@@ -629,34 +633,6 @@ class _RideScreenState extends State<RideScreen> {
             ),
           ),
         ]),
-      ),
-    );
-  }
-
-  Widget _buildMap(double pickupLat, double pickupLng, double destLat, double destLng) {
-    final pickup = LatLng(pickupLat, pickupLng);
-    final dropoff = LatLng(destLat, destLng);
-    final center = LatLng((pickupLat + destLat) / 2, (pickupLng + destLng) / 2);
-
-    return Container(
-      width: double.infinity,
-      height: 260,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceBorder),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: FlutterMap(
-          options: MapOptions(initialCenter: center, initialZoom: 13),
-          children: [
-            TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.studex.driver_app'),
-            MarkerLayer(markers: [
-              Marker(point: pickup, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 36)),
-              Marker(point: dropoff, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.red, size: 36)),
-            ]),
-          ],
-        ),
       ),
     );
   }
@@ -919,5 +895,179 @@ class _RideScreenState extends State<RideScreen> {
     final dLng = (lng2 - lng1) * math.pi / 180;
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(lat1 * math.pi / 180) * math.cos(lat2 * math.pi / 180) * math.sin(dLng / 2) * math.sin(dLng / 2);
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+}
+
+// Trip map with a live driver marker, a route line re-fetched from OSRM as
+// the driver moves, and a "center on me" button -- mirrors the same
+// live-reroute approach already built into the temp customer web app
+// (see user-web-temp/index.html's maybeRerouteLive/drawRoute).
+class _LiveTripMap extends StatefulWidget {
+  final double pickupLat;
+  final double pickupLng;
+  final double destLat;
+  final double destLng;
+  // Trip status, used to decide the re-route target: pickup before
+  // in_progress, destination at/after. Null (e.g. an incoming offer, not yet
+  // accepted) is treated the same as pre-in_progress.
+  final String? status;
+
+  const _LiveTripMap({
+    required this.pickupLat,
+    required this.pickupLng,
+    required this.destLat,
+    required this.destLng,
+    required this.status,
+  });
+
+  @override
+  State<_LiveTripMap> createState() => _LiveTripMapState();
+}
+
+class _LiveTripMapState extends State<_LiveTripMap> {
+  static const _minRerouteInterval = Duration(seconds: 20);
+
+  final _mapController = MapController();
+  LocationService? _locationService;
+  List<LatLng>? _routePoints;
+  DateTime? _lastRerouteAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _locationService = context.read<AppProvider>().locationService;
+    _locationService!.positionNotifier.addListener(_onPosition);
+    final pos = _locationService!.positionNotifier.value;
+    if (pos != null) _maybeReroute(pos);
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveTripMap old) {
+    super.didUpdateWidget(old);
+    if (old.status != widget.status) {
+      // Target switched (e.g. accepted -> in_progress): reroute immediately
+      // instead of waiting out the throttle window.
+      _lastRerouteAt = null;
+      final pos = _locationService?.positionNotifier.value;
+      if (pos != null) _maybeReroute(pos);
+    }
+  }
+
+  @override
+  void dispose() {
+    _locationService?.positionNotifier.removeListener(_onPosition);
+    super.dispose();
+  }
+
+  void _onPosition() {
+    final pos = _locationService?.positionNotifier.value;
+    if (pos != null) _maybeReroute(pos);
+  }
+
+  LatLng get _target => widget.status == 'in_progress'
+      ? LatLng(widget.destLat, widget.destLng)
+      : LatLng(widget.pickupLat, widget.pickupLng);
+
+  Future<void> _maybeReroute(Position pos) async {
+    final now = DateTime.now();
+    if (_lastRerouteAt != null && now.difference(_lastRerouteAt!) < _minRerouteInterval) return;
+    _lastRerouteAt = now;
+
+    final target = _target;
+    List<LatLng> points;
+    try {
+      final uri = Uri.parse('https://router.project-osrm.org/route/v1/driving/'
+          '${pos.longitude},${pos.latitude};${target.longitude},${target.latitude}'
+          '?overview=full&geometries=geojson');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode != 200) throw Exception('osrm ${resp.statusCode}');
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final routes = data['routes'] as List?;
+      if (routes == null || routes.isEmpty) throw Exception('no route');
+      final coords = (routes[0]['geometry']['coordinates'] as List)
+          .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+          .toList();
+      points = coords;
+    } catch (_) {
+      // OSRM unreachable/no route: fall back to a straight line so the
+      // driver still sees where they're headed.
+      points = [LatLng(pos.latitude, pos.longitude), target];
+    }
+    if (!mounted) return;
+    setState(() => _routePoints = points);
+  }
+
+  void _recenter(Position? pos) {
+    if (pos == null) return;
+    final zoom = _mapController.camera.zoom;
+    _mapController.move(LatLng(pos.latitude, pos.longitude), zoom < 15 ? 16 : zoom);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pickup = LatLng(widget.pickupLat, widget.pickupLng);
+    final dropoff = LatLng(widget.destLat, widget.destLng);
+    final center = LatLng((widget.pickupLat + widget.destLat) / 2, (widget.pickupLng + widget.destLng) / 2);
+
+    return Container(
+      width: double.infinity,
+      height: 260,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            ValueListenableBuilder<Position?>(
+              valueListenable: _locationService!.positionNotifier,
+              builder: (context, pos, _) => FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(initialCenter: center, initialZoom: 13),
+                children: [
+                  TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.studex.driver_app'),
+                  if (_routePoints != null)
+                    PolylineLayer(polylines: [
+                      Polyline(points: _routePoints!, strokeWidth: 4, color: AppTheme.accent),
+                    ]),
+                  MarkerLayer(markers: [
+                    Marker(point: pickup, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 36)),
+                    Marker(point: dropoff, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.red, size: 36)),
+                    if (pos != null)
+                      Marker(
+                        point: LatLng(pos.latitude, pos.longitude),
+                        width: 44,
+                        height: 44,
+                        child: const Icon(Icons.two_wheeler, color: AppTheme.accent, size: 32),
+                      ),
+                  ]),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 10,
+              bottom: 10,
+              child: ValueListenableBuilder<Position?>(
+                valueListenable: _locationService!.positionNotifier,
+                builder: (context, pos, _) => Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  elevation: 3,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: pos == null ? null : () => _recenter(pos),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(Icons.my_location, size: 20, color: pos == null ? AppTheme.textMuted : AppTheme.accent),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

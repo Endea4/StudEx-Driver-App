@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../core/constants.dart';
@@ -13,6 +14,12 @@ class LocationService {
   bool _isStreaming = false;
   DateTime? _lastSent;
   static const _minInterval = Duration(seconds: 3);
+
+  // Exposes the driver's live position to the UI (e.g. the trip map's live
+  // marker/re-routing) -- separate from _sendLocationUpdate below, which is
+  // the fire-and-forget push to the backend and was previously the only
+  // consumer of the GPS stream.
+  final ValueNotifier<Position?> positionNotifier = ValueNotifier(null);
 
   LocationService(this._api, this._storage);
 
@@ -42,6 +49,7 @@ class LocationService {
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((Position position) {
+      positionNotifier.value = position;
       _sendLocationUpdate(position.latitude, position.longitude);
     });
   }
