@@ -259,6 +259,11 @@ class RideProvider extends ChangeNotifier {
         paymentStatus: isDebt ? 'debt' : 'paid',
         debtAmount: debtAmount,
       );
+      // Set locally rather than waiting for the trip.completed WS event to
+      // bounce back -- if that event is delayed or missed, the screen was
+      // getting stuck showing the active/map view for an already-completed
+      // trip, even after leaving and re-entering the Ride screen.
+      _state = RideState.completed;
       notifyListeners();
       fetchTrips();
       return true;
