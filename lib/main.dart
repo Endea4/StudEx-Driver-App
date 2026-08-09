@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/nav.dart';
 import 'core/storage/local_storage.dart';
 import 'core/theme.dart';
 import 'providers/app_provider.dart';
@@ -28,7 +29,8 @@ import 'screens/settings/change_password_screen.dart';
 import 'screens/trip/trip_detail_screen.dart';
 import 'screens/ride/ride_screen.dart';
 
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+// navigatorKey now lives in core/nav.dart so providers can navigate without
+// importing main.dart (which would be a circular import).
 final ValueNotifier<Map<String, String>?> testLoginNotifier = ValueNotifier(null);
 
 void main() async {
@@ -114,6 +116,7 @@ class StudExApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       navigatorKey: navigatorKey,
+      navigatorObservers: [routeObserver],
       home: const SplashScreen(),
       routes: {
         '/sign-in': (_) => const SignInScreen(),

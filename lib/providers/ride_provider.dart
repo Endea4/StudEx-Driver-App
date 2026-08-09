@@ -8,7 +8,7 @@ import '../services/ride_service.dart';
 import '../models/ride.dart';
 import '../core/constants.dart';
 
-enum RideState { idle, offer, active, bidRequest, completed }
+enum RideState { idle, offer, expired, active, bidRequest, completed }
 
 class RideProvider extends ChangeNotifier {
   final ApiClient _api;
@@ -27,6 +27,52 @@ class RideProvider extends ChangeNotifier {
   RideOffer? get currentOffer => _currentOffer;
   ActiveTrip? get activeTrip => _activeTrip;
   String? get error => _error;
+
+  /// How long a driver has to answer an offer. Mirrors the trip-service's
+  /// startDriverResponseTimeout (180s), after which the trip is rejected as
+  /// "ignored by driver" and a trip.cancelled event is emitted.
+  static const offerTimeout = Duration(seconds: 180);
+
+  Timer? _offerTicker;
+  DateTime? _offerDeadline;
+
+  /// Seconds remaining to answer the current offer (0 when none).
+  int get offerSecondsLeft {
+    if (_offerDeadline == null) return 0;
+    final left = _offerDeadline!.difference(DateTime.now()).inSeconds;
+    return left > 0 ? left : 0;
+  }
+
+  int get offerTimeoutSeconds => offerTimeout.inSeconds;
+
+  void _startOfferCountdown() {
+    _offerTicker?.cancel();
+    _offerDeadline = DateTime.now().add(offerTimeout);
+    _offerTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (offerSecondsLeft <= 0) {
+        _expireOffer();
+      } else {
+        notifyListeners(); // tick the countdown UI
+      }
+    });
+  }
+
+  void _stopOfferCountdown() {
+    _offerTicker?.cancel();
+    _offerTicker = null;
+    _offerDeadline = null;
+  }
+
+  /// The offer is no longer answerable (countdown hit zero, the server
+  /// cancelled it, or accept found no pending trip). Shows the expired panel
+  /// instead of silently resetting or dead-ending in "Trip tidak ditemukan".
+  void _expireOffer() {
+    _stopOfferCountdown();
+    _currentOffer = null;
+    _state = RideState.expired;
+    _error = null;
+    notifyListeners();
+  }
 
   List<Map<String, dynamic>> _tripHistory = [];
   bool _isLoadingTrips = false;
@@ -86,6 +132,7 @@ class RideProvider extends ChangeNotifier {
           _currentOffer = RideOffer.fromJson(data);
           _state = RideState.offer;
           _error = null;
+          _startOfferCountdown();
           debugPrint('[RideProvider] State → OFFER, orderId=${_currentOffer?.orderId}');
           notifyListeners();
           break;
@@ -174,7 +221,14 @@ class RideProvider extends ChangeNotifier {
           break;
 
         case 'trip.cancelled':
-          _reset();
+          // While showing an offer this means the offer window closed (the
+          // trip-service rejected it as ignored, or the customer cancelled) —
+          // surface that instead of silently blanking the screen.
+          if (_state == RideState.offer) {
+            _expireOffer();
+          } else {
+            _reset();
+          }
           fetchTrips();
           break;
       }
@@ -191,14 +245,22 @@ class RideProvider extends ChangeNotifier {
         _activeTrip = await rideService.acceptTrip(pending['id'] as String);
         _state = RideState.active;
         _currentOffer = null;
+        _stopOfferCountdown();
         // Open the chat room now that the driver has accepted.
         _openChatRoom(_activeTrip!.id, driverId ?? '', _activeTrip!.customerRefId);
         return true;
       }
-      _setError('Trip tidak ditemukan');
+      // No pending trip anymore: the offer expired server-side ("ignored by
+      // driver") or was taken. Show the expired panel, not a dead-end error.
+      _expireOffer();
       return false;
     } catch (e) {
-      _setError(e.toString());
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('trip not found') || msg.contains('invalid trip status')) {
+        _expireOffer();
+      } else {
+        _setError(e.toString());
+      }
       return false;
     } finally {
       _setLoading(false);
@@ -225,6 +287,7 @@ class RideProvider extends ChangeNotifier {
 
     _currentOffer = null;
     _state = RideState.idle;
+    _stopOfferCountdown();
     notifyListeners();
 
     if (tripId != null) {
@@ -311,6 +374,7 @@ class RideProvider extends ChangeNotifier {
     _currentOffer = RideOffer.fromJson(data);
     _state = RideState.offer;
     _error = null;
+    _startOfferCountdown();
     notifyListeners();
   }
 
@@ -337,6 +401,7 @@ class RideProvider extends ChangeNotifier {
     _currentOffer = null;
     _activeTrip = null;
     _error = null;
+    _stopOfferCountdown();
     notifyListeners();
   }
 
@@ -368,6 +433,7 @@ class RideProvider extends ChangeNotifier {
   @override
   void dispose() {
     _wsSub?.cancel();
+    _offerTicker?.cancel();
     super.dispose();
   }
 }

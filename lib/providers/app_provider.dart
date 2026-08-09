@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/nav.dart';
 import '../core/network/api_client.dart';
 import '../core/network/websocket_client.dart';
 import '../core/storage/local_storage.dart';
@@ -29,13 +30,28 @@ class AppProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription? _wsSubscription;
 
-  // Latest incoming ride offer received via WS
+  // Latest incoming ride offer received via WS. Offers expire server-side
+  // (trip-service rejects them as "ignored by driver" after
+  // [RideProvider.offerTimeout]); the getter self-expires so a stale offer is
+  // never replayed into the Ride screen, where accepting it would only yield
+  // "Trip tidak ditemukan".
   Map<String, dynamic>? _latestRideOffer;
-  Map<String, dynamic>? get latestRideOffer => _latestRideOffer;
+  DateTime? _latestRideOfferAt;
+  Map<String, dynamic>? get latestRideOffer {
+    if (_latestRideOffer != null &&
+        _latestRideOfferAt != null &&
+        DateTime.now().difference(_latestRideOfferAt!) > const Duration(seconds: 180)) {
+      _latestRideOffer = null;
+    }
+    return _latestRideOffer;
+  }
+
   void setLatestRideOffer(Map<String, dynamic>? offer) {
     _latestRideOffer = offer;
+    _latestRideOfferAt = DateTime.now();
     notifyListeners();
   }
+
   void clearLatestOffer() { _latestRideOffer = null; }
 
   bool get isAuthenticated => _isAuthenticated;
@@ -94,6 +110,12 @@ class AppProvider extends ChangeNotifier {
       if (type == 'match.completed') {
         NotificationService.instance.show('Pesanan Baru!', 'Ada pesanan masuk');
         setLatestRideOffer(event['data'] as Map<String, dynamic>?);
+        // Auto-open the Ride screen so the driver sees the offer immediately
+        // instead of having to find it via Menu → Ride. Skipped when already
+        // there (RideProvider updates that screen in place).
+        if (currentRouteName != '/ride') {
+          navigatorKey.currentState?.pushNamed('/ride');
+        }
       } else if (type == 'trip.created') {
         NotificationService.instance.show('Trip Dibuat', 'Trip menunggu konfirmasi');
       } else if (type == 'trip.started') {
@@ -102,6 +124,9 @@ class AppProvider extends ChangeNotifier {
         NotificationService.instance.show('Trip Selesai', 'Perjalanan selesai');
       } else if (type == 'trip.cancelled') {
         NotificationService.instance.show('Trip Dibatalkan', 'Perjalanan dibatalkan');
+        // The offer (if any) is dead now — trip-service cancels ignored offers
+        // after the response window. Drop it so it can't be replayed stale.
+        clearLatestOffer();
       }
       // match.timeout ("tidak ada driver tersedia") is addressed to the
       // customer who is still waiting for a match; it says nothing to a

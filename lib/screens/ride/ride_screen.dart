@@ -173,6 +173,8 @@ class _RideScreenState extends State<RideScreen> {
         return _buildIdle();
       case RideState.offer:
         return _buildOffer();
+      case RideState.expired:
+        return _buildExpired();
       case RideState.active:
         return _buildActive();
       case RideState.bidRequest:
@@ -360,6 +362,8 @@ class _RideScreenState extends State<RideScreen> {
           ),
         ),
         _floatingBottomSheet(context, [
+          _buildOfferCountdown(),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -368,8 +372,11 @@ class _RideScreenState extends State<RideScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       final app = context.read<AppProvider>();
-                      final ok = await _provider.acceptOffer();
-                      if (ok) app.clearLatestOffer();
+                      // Either accepted (offer consumed) or found gone
+                      // server-side (offer stale) — both mean the cached
+                      // copy must never be replayed again.
+                      await _provider.acceptOffer();
+                      app.clearLatestOffer();
                     },
                     icon: const Icon(Icons.check, size: 20),
                     label: const Text('Terima', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -400,6 +407,94 @@ class _RideScreenState extends State<RideScreen> {
           ),
         ]),
       ],
+    );
+  }
+
+  /// Countdown bar for the offer response window (mirrors the trip-service's
+  /// 180s "ignored by driver" timeout). Turns red under 30s.
+  Widget _buildOfferCountdown() {
+    final left = _provider.offerSecondsLeft;
+    final total = _provider.offerTimeoutSeconds;
+    final frac = total > 0 ? left / total : 0.0;
+    final urgent = left <= 30;
+    final color = urgent ? AppTheme.danger : AppTheme.accent;
+    final mm = (left ~/ 60).toString();
+    final ss = (left % 60).toString().padLeft(2, '0');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.timer_outlined, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text('Sisa waktu menjawab', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            const Spacer(),
+            Text('$mm:$ss', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: frac,
+            minHeight: 6,
+            backgroundColor: AppTheme.surfaceBorder,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Shown when the offer window closed before the driver answered (or the
+  /// order was taken/cancelled). Replaces the old dead-end where the stale
+  /// offer stayed on screen and accepting it errored "Trip tidak ditemukan".
+  Widget _buildExpired() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: AppTheme.danger.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.timer_off_outlined, size: 44, color: AppTheme.danger),
+            ),
+            const SizedBox(height: 20),
+            const Text('Pesanan Kedaluwarsa',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            const SizedBox(height: 8),
+            const Text(
+              'Waktu menjawab habis atau pesanan sudah tidak tersedia. Pesanan berikutnya akan muncul otomatis.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context.read<AppProvider>().clearLatestOffer();
+                  _provider.reset();
+                },
+                icon: const Icon(Icons.check, size: 18),
+                label: const Text('Mengerti'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
