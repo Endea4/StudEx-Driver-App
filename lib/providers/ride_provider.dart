@@ -29,9 +29,9 @@ class RideProvider extends ChangeNotifier {
   String? get error => _error;
 
   /// How long a driver has to answer an offer. Mirrors the trip-service's
-  /// startDriverResponseTimeout (180s), after which the trip is rejected as
+  /// startDriverResponseTimeout (60s), after which the trip is rejected as
   /// "ignored by driver" and a trip.cancelled event is emitted.
-  static const offerTimeout = Duration(seconds: 180);
+  static const offerTimeout = Duration(seconds: 60);
 
   Timer? _offerTicker;
   DateTime? _offerDeadline;
