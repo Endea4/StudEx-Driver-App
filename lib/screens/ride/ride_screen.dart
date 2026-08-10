@@ -512,6 +512,7 @@ class _RideScreenState extends State<RideScreen> {
             _buildStatusBanner(trip.status),
             const SizedBox(height: 10),
             _badgeRow('Status', StatusBadge.trip(trip.status)),
+            _autoCancelRow(trip),
             _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
             _addrRow('Tujuan', trip.destLat, trip.destLng),
             _infoRow('Jarak', '${distance.toStringAsFixed(1)} km'),
@@ -548,6 +549,10 @@ class _RideScreenState extends State<RideScreen> {
             _buildActionButton('Selesai — Tunai', Icons.money, AppTheme.success, () => _provider.completeTrip(isDebt: false)),
             const SizedBox(height: 12),
             _buildActionButton('Selesai — Utang', Icons.money_off, AppTheme.warning, () => _completeWithDebt(trip.finalPrice)),
+          ],
+          if (trip.status == 'accepted' || trip.status == 'deal' || trip.status == 'in_progress') ...[
+            const SizedBox(height: 12),
+            _buildActionButton('Batalkan Trip', Icons.cancel_outlined, AppTheme.danger, _showAbortDialog),
           ],
         ]),
       ],
@@ -673,6 +678,7 @@ class _RideScreenState extends State<RideScreen> {
         _floatingTopCard(context, [
           _addrRow('Jemput', trip.pickupLat, trip.pickupLng),
           _addrRow('Tujuan', trip.destLat, trip.destLng),
+          _autoCancelRow(trip),
         ]),
         _floatingBottomSheet(context, [
           // Chat was only wired into _buildActive() (accepted/deal/in_progress)
@@ -833,6 +839,54 @@ class _RideScreenState extends State<RideScreen> {
       // old text-only modal.
       Navigator.push(context, MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)));
     }
+  }
+
+  /// Auto-cancel countdown (ticked by RideProvider's 1s timer; deadline is the
+  /// backend's auto_cancel_at, so this always matches what the server enforces).
+  Widget _autoCancelRow(ActiveTrip trip) {
+    if (trip.autoCancelAt == null) return const SizedBox.shrink();
+    final left = _provider.autoCancelSecondsLeft;
+    if (left <= 0) return const SizedBox.shrink();
+    return _infoRow('Auto-batal', 'dalam ${_formatCountdown(left)} bila tidak ada aksi');
+  }
+
+  String _formatCountdown(int s) {
+    if (s >= 3600) return '${s ~/ 3600} jam ${(s % 3600) ~/ 60} mnt';
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  void _showAbortDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Batalkan Trip'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Trip yang sudah berjalan akan dibatalkan dan customer diberi tahu.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(hintText: 'Alasan membatalkan (opsional)', border: OutlineInputBorder()),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kembali')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final reason = reasonController.text.trim();
+              _provider.abortTrip(reason: reason.isEmpty ? 'dibatalkan driver' : reason);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger, foregroundColor: Colors.white),
+            child: const Text('Batalkan Trip'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showRejectDialog() {

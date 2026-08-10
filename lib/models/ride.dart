@@ -55,6 +55,11 @@ class ActiveTrip {
   final String paymentStatus;
   final String customerRefId;
 
+  /// Backend-computed deadline: the trip is auto-cancelled at this time if
+  /// nothing touches it (per-status inactivity timeout). Null for terminal
+  /// statuses and for partial WS payloads.
+  final DateTime? autoCancelAt;
+
   ActiveTrip({
     required this.id,
     required this.orderId,
@@ -70,6 +75,7 @@ class ActiveTrip {
     this.reason,
     this.paymentStatus = '',
     this.customerRefId = '',
+    this.autoCancelAt,
   });
 
   factory ActiveTrip.fromJson(Map<String, dynamic> json) {
@@ -88,6 +94,7 @@ class ActiveTrip {
       lastBidder: json['last_bidder'],
       reason: json['reason'],
       paymentStatus: json['payment_status'] ?? '',
+      autoCancelAt: DateTime.tryParse(json['auto_cancel_at'] ?? '')?.toLocal(),
     );
   }
 

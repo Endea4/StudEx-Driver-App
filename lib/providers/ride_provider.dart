@@ -36,6 +36,20 @@ class RideProvider extends ChangeNotifier {
   Timer? _offerTicker;
   DateTime? _offerDeadline;
 
+  /// Ticks the auto-cancel countdown shown on active trips. The deadline
+  /// itself comes from the backend (auto_cancel_at) so the UI always matches
+  /// what the trip-service sweep will actually enforce.
+  Timer? _staleTicker;
+
+  /// Seconds until the backend auto-cancels the current trip for inactivity
+  /// (0 when unknown/not applicable).
+  int get autoCancelSecondsLeft {
+    final at = _activeTrip?.autoCancelAt;
+    if (at == null) return 0;
+    final left = at.difference(DateTime.now()).inSeconds;
+    return left > 0 ? left : 0;
+  }
+
   /// Seconds remaining to answer the current offer (0 when none).
   int get offerSecondsLeft {
     if (_offerDeadline == null) return 0;
@@ -116,6 +130,12 @@ class RideProvider extends ChangeNotifier {
   RideProvider(this._api, this._ws, this._storage) {
     rideService = RideService(_api);
     _listenWs();
+    _staleTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_activeTrip?.autoCancelAt != null &&
+          (_state == RideState.active || _state == RideState.bidRequest)) {
+        notifyListeners();
+      }
+    });
   }
 
   void _listenWs() {
@@ -169,6 +189,7 @@ class RideProvider extends ChangeNotifier {
           _state = RideState.active;
           _error = null;
           notifyListeners();
+          _refreshFullTrip();
           break;
 
         case 'trip.started':
@@ -177,6 +198,7 @@ class RideProvider extends ChangeNotifier {
           }
           _state = RideState.active;
           notifyListeners();
+          _refreshFullTrip();
           break;
 
         case 'trip.completed':
@@ -217,6 +239,11 @@ class RideProvider extends ChangeNotifier {
           // and held no prior trip), pull the full trip from the backend.
           if (_activeTrip!.pickupLat == 0 && _activeTrip!.destLat == 0) {
             _refreshTripFromBackend();
+          } else {
+            // Partial event payloads carry no auto_cancel_at; a quiet reload
+            // keeps the inactivity countdown matching the backend (each bid
+            // resets the bargaining deadline).
+            _refreshFullTrip();
           }
           break;
 
@@ -338,6 +365,26 @@ class RideProvider extends ChangeNotifier {
     }
   }
 
+  /// Driver-side cancel of an accepted/deal/in-progress trip (backend
+  /// "abort", which keeps its own bookkeeping separate from customer cancels).
+  Future<bool> abortTrip({String reason = ''}) async {
+    if (_activeTrip == null) return false;
+    _setLoading(true);
+    try {
+      await rideService.abortTrip(_activeTrip!.id, reason: reason);
+      // Reset locally instead of waiting for the trip.aborted WS bounce, same
+      // rationale as completeTrip.
+      _reset();
+      fetchTrips();
+      return true;
+    } catch (e) {
+      _setActionError(e);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<bool> submitBid(double amount, {String reason = ''}) async {
     if (_activeTrip == null) return false;
     _setLoading(true);
@@ -425,6 +472,18 @@ class RideProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Reloads the current trip by id (any status) — used after partial WS
+  /// events so backend-derived fields like auto_cancel_at stay accurate.
+  void _refreshFullTrip() {
+    final id = _activeTrip?.id;
+    if (id == null || id.isEmpty) return;
+    rideService.fetchTrip(id).then((full) {
+      if (full == null || full.id != _activeTrip?.id) return;
+      _activeTrip = full;
+      notifyListeners();
+    }, onError: (_) {});
+  }
+
   void _setError(String? e) {
     _error = e;
     notifyListeners();
@@ -434,6 +493,7 @@ class RideProvider extends ChangeNotifier {
   void dispose() {
     _wsSub?.cancel();
     _offerTicker?.cancel();
+    _staleTicker?.cancel();
     super.dispose();
   }
 }

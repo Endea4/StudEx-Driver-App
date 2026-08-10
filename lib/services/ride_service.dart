@@ -104,6 +104,24 @@ class RideService {
     throw RideException.from('Gagal mengirim bid', res.body);
   }
 
+  Future<ActiveTrip?> fetchTrip(String tripId) async {
+    final res = await _api.get('/trips/$tripId');
+    if (res.statusCode == 200) {
+      return ActiveTrip.fromJson(jsonDecode(res.body));
+    }
+    return null;
+  }
+
+  Future<void> abortTrip(String tripId, {String reason = ''}) async {
+    final res = await _api.put('/trips/$tripId/abort', body: {
+      'reason': reason,
+      'aborted_by': 'driver',
+    });
+    if (res.statusCode != 200) {
+      throw RideException.from('Gagal membatalkan trip', res.body);
+    }
+  }
+
   Future<ActiveTrip> dealTrip(String tripId) async {
     final res = await _api.put('/trips/$tripId/deal');
     if (res.statusCode == 200) {
